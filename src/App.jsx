@@ -113,9 +113,9 @@ function ErrorScreen({message}){
 /* ══════════════════════════════════════
    MAIN APP
 ══════════════════════════════════════ */
-export default function App({slug}){
+export default function App({slug,readOnly=false}){
   const pageSlug=slug||window.location.pathname.replace(/^\//,"").split("/")[0];
-  const {project,loading,error,updateProject,toggleTask,addTask,deleteTask,updateBudgetCategory,addBudgetCategory,deleteBudgetCategory,addInvoice,updateInvoice,deleteInvoice,addDocument,updateDocument,deleteDocument,addVendor,updateVendor,deleteVendor,updateCoverImage}=useProject(pageSlug);
+  const {project,loading,error,updateProject,toggleTask,addTask,deleteTask,updateBudgetCategory,addBudgetCategory,deleteBudgetCategory,addInvoice,updateInvoice,deleteInvoice,addDocument,updateDocument,deleteDocument,addVendor,updateVendor,deleteVendor,updateCoverImage}=useProject(pageSlug,readOnly);
 
   const [tab,setTab]=useState("home");
   const [subP,setSubP]=useState("checklist");
@@ -281,6 +281,12 @@ export default function App({slug}){
         <span style={{fontFamily:"Dancing Script,cursive",fontSize:21,color:G900}}>Damargaleri</span>
         <div style={{width:18}}/>
       </div>
+
+      {readOnly&&(
+        <div style={{background:"#FFF7E6",color:"#8A5A00",fontSize:11,fontWeight:600,textAlign:"center",padding:"8px 14px",borderBottom:"1px solid #F1D7A5"}}>
+          Mode demo · perubahan tidak disimpan
+        </div>
+      )}
 
       <div style={{flex:1,paddingBottom:90}}>
 
