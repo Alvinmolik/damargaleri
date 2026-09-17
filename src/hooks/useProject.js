@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-export function useProject(slug) {
+export function useProject(slug, readOnly = false) {
   const [project, setProject]   = useState(null)
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState(null)
@@ -32,8 +32,11 @@ export function useProject(slug) {
     setLoading(false)
   }
 
+  const rejectReadOnly = () => ({ error: new Error('Mode demo hanya dapat dilihat.') })
+
   // ── Project detail ─────────────────────────────────────
   async function updateProject(data) {
+    if (readOnly) return rejectReadOnly()
     const { error } = await supabase
       .from('projects')
       .update(data)
@@ -44,6 +47,7 @@ export function useProject(slug) {
 
   // ── Checklist ──────────────────────────────────────────
   async function toggleTask(taskId, done) {
+    if (readOnly) return rejectReadOnly()
     const { error } = await supabase
       .from('checklist_tasks')
       .update({ done })
@@ -52,6 +56,7 @@ export function useProject(slug) {
   }
 
   async function addTask(phaseId, task) {
+    if (readOnly) return rejectReadOnly()
     const { error } = await supabase
       .from('checklist_tasks')
       .insert({
@@ -67,6 +72,7 @@ export function useProject(slug) {
   }
 
   async function deleteTask(taskId) {
+    if (readOnly) return rejectReadOnly()
     const { error } = await supabase.from('checklist_tasks').delete().eq('id', taskId)
     if (!error) fetchProject()
     return { error }
@@ -74,12 +80,14 @@ export function useProject(slug) {
 
   // ── Budget ─────────────────────────────────────────────
   async function updateBudgetCategory(id, data) {
+    if (readOnly) return rejectReadOnly()
     const { error } = await supabase.from('budget_categories').update(data).eq('id', id)
     if (!error) fetchProject()
     return { error }
   }
 
   async function addBudgetCategory(name) {
+    if (readOnly) return rejectReadOnly()
     if (!project?.id) return { error: new Error('No project') }
     const { error } = await supabase.from('budget_categories')
       .insert({ project_id: project.id, name, icon: '💸', allocated: 0, spent: 0 })
@@ -88,6 +96,7 @@ export function useProject(slug) {
   }
 
   async function deleteBudgetCategory(id) {
+    if (readOnly) return rejectReadOnly()
     const { error } = await supabase.from('budget_categories').delete().eq('id', id)
     if (!error) fetchProject()
     return { error }
@@ -95,6 +104,7 @@ export function useProject(slug) {
 
   // ── Invoice ────────────────────────────────────────────
   async function addInvoice(inv) {
+    if (readOnly) return rejectReadOnly()
     const { error } = await supabase.from('invoices')
       .insert({ ...inv, project_id: project.id })
     if (!error) fetchProject()
@@ -102,12 +112,14 @@ export function useProject(slug) {
   }
 
   async function updateInvoice(id, data) {
+    if (readOnly) return rejectReadOnly()
     const { error } = await supabase.from('invoices').update(data).eq('id', id)
     if (!error) fetchProject()
     return { error }
   }
 
   async function deleteInvoice(id) {
+    if (readOnly) return rejectReadOnly()
     const { error } = await supabase.from('invoices').delete().eq('id', id)
     if (!error) fetchProject()
     return { error }
@@ -115,6 +127,7 @@ export function useProject(slug) {
 
   // ── Document ───────────────────────────────────────────
   async function addDocument(doc) {
+    if (readOnly) return rejectReadOnly()
     const { error } = await supabase.from('documents')
       .insert({ ...doc, project_id: project.id })
     if (!error) fetchProject()
@@ -122,12 +135,14 @@ export function useProject(slug) {
   }
 
   async function updateDocument(id, data) {
+    if (readOnly) return rejectReadOnly()
     const { error } = await supabase.from('documents').update(data).eq('id', id)
     if (!error) fetchProject()
     return { error }
   }
 
   async function deleteDocument(id) {
+    if (readOnly) return rejectReadOnly()
     const { error } = await supabase.from('documents').delete().eq('id', id)
     if (!error) fetchProject()
     return { error }
@@ -135,6 +150,7 @@ export function useProject(slug) {
 
   // ── Vendor ─────────────────────────────────────────────
   async function addVendor(vendor) {
+    if (readOnly) return rejectReadOnly()
     const { error } = await supabase.from('vendors')
       .insert({ ...vendor, project_id: project.id })
     if (!error) fetchProject()
@@ -142,12 +158,14 @@ export function useProject(slug) {
   }
 
   async function updateVendor(id, data) {
+    if (readOnly) return rejectReadOnly()
     const { error } = await supabase.from('vendors').update(data).eq('id', id)
     if (!error) fetchProject()
     return { error }
   }
 
   async function deleteVendor(id) {
+    if (readOnly) return rejectReadOnly()
     const { error } = await supabase.from('vendors').delete().eq('id', id)
     if (!error) fetchProject()
     return { error }
@@ -155,6 +173,7 @@ export function useProject(slug) {
 
   // ── Cover image ────────────────────────────────────────
   async function updateCoverImage(file) {
+    if (readOnly) return rejectReadOnly()
     const ext = file.name.split('.').pop()
     const path = `covers/${project.id}.${ext}`
     const { error: uploadError } = await supabase.storage
