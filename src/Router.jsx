@@ -20,10 +20,11 @@ export default function Router() {
   const slug = path.replace(/^\//, '').split('/')[0]
   const isClientRoute = slug && slug !== 'admin' && slug !== ''
 
-  // Admin route
+  // Admin route — default deny. Only explicit admin roles may enter.
   if (isAdminRoute) {
     if (!user) return <LoginPage mode="admin" />
-    if (profile?.role === 'client') return <div style={err}>Akses ditolak.</div>
+    const hasAdminAccess = profile?.role === 'admin' || profile?.role === 'superadmin'
+    if (!hasAdminAccess) return <div style={err}>Akses admin ditolak.</div>
     return <AdminDashboard />
   }
 
