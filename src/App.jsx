@@ -115,10 +115,11 @@ function ErrorScreen({message}){
 ══════════════════════════════════════ */
 export default function App({slug,readOnly=false}){
   const pageSlug=slug||window.location.pathname.replace(/^\//,"").split("/")[0];
-  const {project,loading,error,updateProject,toggleTask,addTask,deleteTask,updateBudgetCategory,addBudgetCategory,deleteBudgetCategory,addInvoice,updateInvoice,deleteInvoice,addDocument,updateDocument,deleteDocument,addVendor,updateVendor,deleteVendor,updateCoverImage}=useProject(pageSlug,readOnly);
+  const {project,loading,error,updateProject,toggleTask,addTask,updateTask,deleteTask,updateBudgetCategory,addBudgetCategory,deleteBudgetCategory,addInvoice,updateInvoice,deleteInvoice,addDocument,updateDocument,deleteDocument,addVendor,updateVendor,deleteVendor,updateCoverImage}=useProject(pageSlug,readOnly);
 
   const [tab,setTab]=useState("home");
   const [subP,setSubP]=useState("checklist");
+  const [checklistModule,setChecklistModule]=useState("timeline");
   const [subW,setSubW]=useState("detail");
   const [expanded,setExp]=useState(null);
   const [addingTo,setAddTo]=useState(null);
@@ -171,12 +172,21 @@ export default function App({slug,readOnly=false}){
     tick();const id=setInterval(tick,1000);return()=>clearInterval(id);
   },[project?.wedding_date]);
 
-  useEffect(()=>{if(project?.checklist_phases?.length&&!expanded)setExp(project.checklist_phases[0].id);},[project]);
+  useEffect(()=>{
+    const first=(project?.checklist_phases||[])
+      .filter(phase=>(phase.module||"timeline")===checklistModule)
+      .sort((a,b)=>(a.sort_order||0)-(b.sort_order||0))[0];
+    setExp(first?.id||null);
+  },[project?.id,checklistModule]);
 
   if(loading)return <LoadingScreen/>;
   if(error||!project)return <ErrorScreen message="Project tidak ditemukan atau kamu tidak punya akses."/>;
 
-  const phases=project.checklist_phases||[];
+  const phases=[...(project.checklist_phases||[])]
+    .sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+  const filteredPhases=phases.filter(
+    phase=>(phase.module||"timeline")===checklistModule
+  );
   const budget=project.budget_categories||[];
   const vendors=project.vendors||[];
   const invoices=project.invoices||[];
@@ -208,6 +218,22 @@ export default function App({slug,readOnly=false}){
     if(!newTask.text.trim()){setTaskErr("Tulis nama tugas dulu.");return;}
     await addTask(pid,newTask);
     setNewTask({text:"",pic:"",loc:"",due_date:""});setTaskErr("");setAddTo(null);
+  }
+
+  async function handleEditTask(task){
+    const text=window.prompt("Nama tugas",task.text);
+    if(text===null||!text.trim())return;
+    const pic=window.prompt("PIC / penanggung jawab",task.pic||"Pasangan");
+    if(pic===null)return;
+    const loc=window.prompt("Lokasi",task.location||"—");
+    if(loc===null)return;
+    const dueDate=window.prompt("Tanggal target (YYYY-MM-DD, boleh kosong)",task.due_date||"");
+    if(dueDate===null)return;
+    const {error}=await updateTask(task.id,{
+      text:text.trim(),pic:pic.trim(),loc:loc.trim(),due_date:dueDate.trim(),
+      details:task.details||"",
+    });
+    if(error)window.alert("Gagal mengubah tugas: "+error.message);
   }
   async function handleSaveBudget(id){
     const a=parseInt(budgetInput.alloc.replace(/\D/g,""))||0;
@@ -430,8 +456,25 @@ export default function App({slug,readOnly=false}){
               </div>
             </div>
 
-            {phases.map((phase,phaseIdx)=>{
-              const phaseTasks=(phase.checklist_tasks||[]).map(t=>({...t,done:localDone[t.id]!==undefined?localDone[t.id]:t.done}));
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:7,marginBottom:12}}>
+              {[
+                ["timeline","🗓️","Timeline"],
+                ["keperluan","📦","Keperluan"],
+                ["kua","📄","KUA"],
+              ].map(([id,icon,label])=>(
+                <button key={id} onClick={()=>setChecklistModule(id)} style={{
+                  padding:"9px 6px",fontSize:11,fontWeight:600,borderRadius:10,
+                  border:`1px solid ${checklistModule===id?G700:BORDER}`,
+                  color:checklistModule===id?"#fff":G700,
+                  background:checklistModule===id?G700:WHITE,cursor:"pointer",
+                }}>{icon} {label}</button>
+              ))}
+            </div>
+
+            {filteredPhases.map((phase,phaseIdx)=>{
+              const phaseTasks=[...(phase.checklist_tasks||[])]
+                .sort((a,b)=>(a.sort_order||0)-(b.sort_order||0))
+                .map(t=>({...t,done:localDone[t.id]!==undefined?localDone[t.id]:t.done}));
               const isOpen=expanded===phase.id;
               const done=phaseTasks.filter(t=>t.done).length;
               const allDone=done===phaseTasks.length&&phaseTasks.length>0;
@@ -469,17 +512,21 @@ export default function App({slug,readOnly=false}){
                             <div style={{flex:1}}>
                               <p className={isDone?"task-strike":""}
                                 style={{fontSize:13,color:isDone?MUTED:MID,margin:"0 0 5px",lineHeight:1.4,transition:"color .3s"}}>{task.text}</p>
+                              {task.details&&<p style={{fontSize:11,color:MUTED,margin:"0 0 6px",lineHeight:1.45}}>{task.details}</p>}
                               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                                 <span style={{fontSize:10,color:G700,background:G50,padding:"2px 7px",borderRadius:20,border:`0.5px solid ${G100}`}}>👤 {task.pic||"Pasangan"}</span>
                                 <span style={{fontSize:10,color:MUTED,background:"#F5F5F5",padding:"2px 7px",borderRadius:20}}>📍 {task.location||"—"}</span>
                                 {task.due_date&&<span style={{fontSize:10,color:AMBER,background:AMBERBG,padding:"2px 7px",borderRadius:20}}>📅 {new Date(task.due_date).toLocaleDateString("id-ID",{day:"numeric",month:"short",year:"numeric"})}</span>}
                               </div>
                             </div>
-                            <button onClick={e=>{e.stopPropagation();setConfirmDelete({type:"task",id:task.id,label:task.text});}} style={{padding:"2px 6px",background:"none",border:"none",cursor:"pointer",color:MUTED,fontSize:16,opacity:.4,flexShrink:0}}>×</button>
+                            {!readOnly&&<div style={{display:"flex",gap:2,flexShrink:0}}>
+                              <button onClick={e=>{e.stopPropagation();handleEditTask(task);}} style={{padding:"2px 5px",background:"none",border:"none",cursor:"pointer",color:G700,fontSize:13,opacity:.65}}>✎</button>
+                              <button onClick={e=>{e.stopPropagation();setConfirmDelete({type:"task",id:task.id,label:task.text});}} style={{padding:"2px 5px",background:"none",border:"none",cursor:"pointer",color:MUTED,fontSize:16,opacity:.4}}>×</button>
+                            </div>}
                           </div>
                         );
                       })}
-                      {addingTo===phase.id?(
+                      {!readOnly&&(addingTo===phase.id?(
                         <div style={{padding:"12px 16px"}}>
                           <input value={newTask.text} placeholder="Nama tugas..." autoFocus onChange={e=>{setNewTask(p=>({...p,text:e.target.value}));setTaskErr("");}} onKeyDown={e=>e.key==="Enter"&&handleAddTask(phase.id)} style={{...inp(),marginBottom:8,borderColor:taskErr?RED:BORDER2}}/>
                           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
@@ -498,7 +545,7 @@ export default function App({slug,readOnly=false}){
                         <button onClick={()=>{setAddTo(phase.id);setNewTask({text:"",pic:"",loc:"",due_date:""}); }} style={{display:"flex",alignItems:"center",gap:6,padding:"12px 16px",background:"none",border:"none",cursor:"pointer",color:G700,fontSize:13,width:"100%"}}>
                           <span style={{fontSize:18}}>+</span> Tambah Sub-tugas di {phase.label}
                         </button>
-                      )}
+                      ))}
                     </div>
                   )}
                 </div>
