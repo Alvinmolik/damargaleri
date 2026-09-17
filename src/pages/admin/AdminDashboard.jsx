@@ -40,14 +40,17 @@ export default function AdminDashboard() {
     bride_name: '', groom_name: '', wedding_date: '',
     venue: '', location: 'Surabaya', guest_count: '',
     budget_total: '', package_name: 'Full Service Premium',
-    assigned_admin: '',
+    assigned_admin: '', client_name: '', client_email: '',
   })
   const [formErr, setFormErr]   = useState('')
   const [saving, setSaving]     = useState(false)
   const [copied, setCopied]     = useState(null)
+  const [inviteDrafts, setInviteDrafts] = useState({})
+  const [inviteBusy, setInviteBusy] = useState(null)
+  const [inviteMessage, setInviteMessage] = useState({})
 
   // New PM form
-  const [pmForm, setPmForm]     = useState({ full_name:'', email:'', password:'', wa_number:'' })
+  const [pmForm, setPmForm]     = useState({ full_name:'', email:'', wa_number:'' })
   const [pmErr, setPmErr]       = useState('')
   const [pmSuccess, setPmSuccess] = useState('')
   const [savingPm, setSavingPm] = useState(false)
@@ -61,7 +64,7 @@ export default function AdminDashboard() {
     setLoading(true)
     const { data } = await supabase
       .from('projects')
-      .select('*, profiles!assigned_admin(full_name, wa_number)')
+      .select('*, profiles!assigned_admin(full_name, wa_number), project_invitations(*)')
       .order('created_at', { ascending: false })
     setProjects(data || [])
     setLoading(false)
@@ -76,50 +79,74 @@ export default function AdminDashboard() {
     setAdmins(data || [])
   }
 
+  async function invokeAccess(body) {
+    const { data, error } = await supabase.functions.invoke('manage-access', { body })
+    if (error) {
+      let message = error.message || 'Fungsi akses gagal.'
+      try {
+        const detail = await error.context?.json()
+        if (detail?.error) message = detail.error
+      } catch {}
+      throw new Error(message)
+    }
+    if (data?.error) throw new Error(data.error)
+    return data
+  }
+
   async function handleCreatePM(e) {
     e.preventDefault()
     if (!pmForm.full_name.trim()) { setPmErr('Nama wajib diisi.'); return }
     if (!pmForm.email.trim()) { setPmErr('Email wajib diisi.'); return }
-    if (pmForm.password.length < 8) { setPmErr('Password minimal 8 karakter.'); return }
     setSavingPm(true); setPmErr(''); setPmSuccess('')
 
-    // Create user via Supabase admin
-    const { data, error } = await supabase.auth.admin.createUser({
-      email: pmForm.email.trim(),
-      password: pmForm.password,
-      email_confirm: true,
-      user_metadata: { full_name: pmForm.full_name.trim(), role: 'admin' }
-    })
-
-    if (error) {
-      // Fallback: use signUp if admin API not available
-      const { data: signupData, error: signupErr } = await supabase.auth.signUp({
-        email: pmForm.email.trim(),
-        password: pmForm.password,
-        options: { data: { full_name: pmForm.full_name.trim(), role: 'admin' } }
-      })
-      if (signupErr) { setPmErr('Gagal buat akun: ' + signupErr.message); setSavingPm(false); return }
-
-      // Update profile
-      if (signupData.user) {
-        await supabase.from('profiles').update({
-          role: 'admin',
-          full_name: pmForm.full_name.trim(),
-          wa_number: pmForm.wa_number.trim() || null,
-        }).eq('id', signupData.user.id)
-      }
-    } else if (data.user) {
-      await supabase.from('profiles').update({
-        role: 'admin',
+    try {
+      await invokeAccess({
+        action: 'create_pm',
         full_name: pmForm.full_name.trim(),
-        wa_number: pmForm.wa_number.trim() || null,
-      }).eq('id', data.user.id)
+        email: pmForm.email.trim(),
+        wa_number: pmForm.wa_number.trim(),
+      })
+      setPmSuccess(`Undangan PM dikirim ke ${pmForm.email}.`)
+      setPmForm({ full_name:'', email:'', wa_number:'' })
+      await fetchAdmins()
+    } catch (err) {
+      setPmErr('Gagal mengirim undangan PM: ' + err.message)
+    } finally {
+      setSavingPm(false)
     }
+  }
 
-    setPmSuccess(`Akun PM "${pmForm.full_name}" berhasil dibuat! Email: ${pmForm.email}`)
-    setPmForm({ full_name:'', email:'', password:'', wa_number:'' })
-    setSavingPm(false)
-    fetchAdmins()
+  async function handleSendInvitation(project, invitation) {
+    const key = invitation.id || project.id
+    setInviteBusy(key)
+    setInviteMessage(p => ({ ...p, [project.id]: '' }))
+    try {
+      await invokeAccess({
+        action: 'invite_client',
+        project_id: project.id,
+        email: invitation.email,
+        client_name: invitation.client_name || '',
+      })
+      setInviteMessage(p => ({ ...p, [project.id]: `Undangan dikirim ke ${invitation.email}.` }))
+      await fetchProjects()
+    } catch (err) {
+      setInviteMessage(p => ({ ...p, [project.id]: 'Gagal: ' + err.message }))
+    } finally {
+      setInviteBusy(null)
+    }
+  }
+
+  async function handleNewInvitation(project) {
+    const draft = inviteDrafts[project.id] || {}
+    if (!draft.email?.trim()) {
+      setInviteMessage(p => ({ ...p, [project.id]: 'Email client wajib diisi.' }))
+      return
+    }
+    await handleSendInvitation(project, {
+      email: draft.email.trim(),
+      client_name: draft.name?.trim() || '',
+    })
+    setInviteDrafts(p => ({ ...p, [project.id]: { name:'', email:'' } }))
   }
 
   function generateSlug(bride, groom) {
@@ -163,6 +190,18 @@ export default function AdminDashboard() {
       .single()
 
     if (error) { setFormErr('Gagal membuat project: ' + error.message); setSaving(false); return }
+
+    if (form.client_email.trim()) {
+      const { error: inviteError } = await supabase.from('project_invitations').insert({
+        project_id: project.id,
+        email: form.client_email.trim().toLowerCase(),
+        client_name: form.client_name.trim() || null,
+        status: 'pending',
+      })
+      if (inviteError) {
+        setFormErr('Project dibuat, tetapi email client gagal disimpan: ' + inviteError.message)
+      }
+    }
 
     // Seed default checklist phases
     const phases = [
@@ -245,7 +284,8 @@ export default function AdminDashboard() {
     setView('projects')
     fetchProjects()
     setForm({ bride_name:'',groom_name:'',wedding_date:'',venue:'',location:'Surabaya',
-      guest_count:'',budget_total:'',package_name:'Full Service Premium',assigned_admin:'' })
+      guest_count:'',budget_total:'',package_name:'Full Service Premium',assigned_admin:'',
+      client_name:'',client_email:'' })
   }
 
   function copyLink(slug) {
@@ -357,6 +397,8 @@ export default function AdminDashboard() {
                   const isUpcoming = weddingDate && weddingDate > new Date()
                   const status = !weddingDate ? 'active' : isUpcoming ? 'upcoming' : 'done'
                   const clientUrl = `${window.location.origin}/${p.slug}`
+                  const invitations = p.project_invitations || []
+                  const draft = inviteDrafts[p.id] || { name:'', email:'' }
 
                   return (
                     <div key={p.id} style={{
@@ -410,6 +452,57 @@ export default function AdminDashboard() {
                           cursor: 'pointer', textDecoration: 'none', flexShrink: 0,
                         }}>Buka ↗</a>
                       </div>
+
+                      {p.slug !== 'demo' && (
+                        <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${BORDER}` }}>
+                          <p style={{ fontSize: 11, fontWeight: 700, color: G700, margin: '0 0 8px',
+                            letterSpacing: '.04em' }}>AKSES CLIENT</p>
+                          {invitations.map(inv => (
+                            <div key={inv.id} style={{ display:'flex', alignItems:'center', gap:8,
+                              marginBottom:7, padding:'7px 9px', background:'#FAFAFA', borderRadius:8 }}>
+                              <div style={{ flex:1, minWidth:0 }}>
+                                <p style={{ fontSize:12, color:DARK, margin:'0 0 2px',
+                                  overflow:'hidden', textOverflow:'ellipsis' }}>
+                                  {inv.client_name || 'Client'} · {inv.email}
+                                </p>
+                                <p style={{ fontSize:10, color:MUTED, margin:0 }}>
+                                  Status: {inv.status === 'accepted' ? 'Sudah aktif' :
+                                    inv.status === 'sent' ? 'Undangan terkirim' :
+                                    inv.status === 'error' ? 'Gagal dikirim' : 'Belum dikirim'}
+                                </p>
+                              </div>
+                              <button onClick={() => handleSendInvitation(p, inv)}
+                                disabled={inviteBusy === inv.id}
+                                style={{ fontSize:11, fontWeight:600, padding:'5px 9px',
+                                  background:G900, color:WHITE, border:'none', borderRadius:6,
+                                  cursor: inviteBusy === inv.id ? 'not-allowed' : 'pointer' }}>
+                                {inviteBusy === inv.id ? 'Mengirim...' :
+                                  inv.status === 'pending' ? 'Kirim undangan' : 'Kirim ulang'}
+                              </button>
+                            </div>
+                          ))}
+                          <div style={{ display:'grid', gridTemplateColumns:'1fr 1.4fr auto', gap:6 }}>
+                            <input value={draft.name || ''}
+                              onChange={e => setInviteDrafts(s => ({ ...s,
+                                [p.id]: { ...draft, name:e.target.value } }))}
+                              placeholder="Nama client" style={inp({ padding:'7px 9px', fontSize:11 })}/>
+                            <input type="email" value={draft.email || ''}
+                              onChange={e => setInviteDrafts(s => ({ ...s,
+                                [p.id]: { ...draft, email:e.target.value } }))}
+                              placeholder="email@client.com" style={inp({ padding:'7px 9px', fontSize:11 })}/>
+                            <button onClick={() => handleNewInvitation(p)}
+                              disabled={inviteBusy === p.id}
+                              style={{ fontSize:11, fontWeight:600, padding:'6px 10px',
+                                background:G50, color:G700, border:`1px solid ${G100}`,
+                                borderRadius:6, cursor:'pointer' }}>+ Tambah</button>
+                          </div>
+                          {inviteMessage[p.id] && (
+                            <p style={{ fontSize:11,
+                              color: inviteMessage[p.id].startsWith('Gagal') ? RED : G700,
+                              margin:'7px 0 0' }}>{inviteMessage[p.id]}</p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -458,6 +551,23 @@ export default function AdminDashboard() {
                   </p>
                 </div>
               )}
+
+              <p style={{ fontSize: 11, color: G700, fontWeight: 600,
+                letterSpacing: '.04em', margin: '0 0 10px' }}>AKSES CLIENT UTAMA</p>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:16 }}>
+                <div>
+                  <p style={{ fontSize:12, color:MUTED, margin:'0 0 5px' }}>Nama client</p>
+                  <input value={form.client_name}
+                    onChange={e => setForm(p => ({ ...p, client_name:e.target.value }))}
+                    placeholder="mis. Rania" style={inp()}/>
+                </div>
+                <div>
+                  <p style={{ fontSize:12, color:MUTED, margin:'0 0 5px' }}>Email client</p>
+                  <input type="email" value={form.client_email}
+                    onChange={e => setForm(p => ({ ...p, client_email:e.target.value }))}
+                    placeholder="email@client.com" style={inp()}/>
+                </div>
+              </div>
 
               {/* Detail */}
               <p style={{ fontSize: 11, color: G700, fontWeight: 600,
@@ -591,13 +701,10 @@ export default function AdminDashboard() {
                       style={{ width: '100%', padding: '9px 12px', fontSize: 13, border: `1px solid ${BORDER}`,
                         borderRadius: 8, outline: 'none', color: DARK, fontFamily: 'Inter, sans-serif', boxSizing: 'border-box' }}/>
                   </div>
-                  <div>
-                    <p style={{ fontSize: 12, color: MUTED, margin: '0 0 5px' }}>Password (min. 8 karakter)</p>
-                    <input type="password" value={pmForm.password}
-                      onChange={e => setPmForm(p => ({ ...p, password: e.target.value }))}
-                      placeholder="••••••••"
-                      style={{ width: '100%', padding: '9px 12px', fontSize: 13, border: `1px solid ${BORDER}`,
-                        borderRadius: 8, outline: 'none', color: DARK, fontFamily: 'Inter, sans-serif', boxSizing: 'border-box' }}/>
+                  <div style={{ display:'flex', alignItems:'end' }}>
+                    <p style={{ fontSize:12, color:MUTED, margin:'0 0 9px', lineHeight:1.5 }}>
+                      PM akan menerima email undangan untuk mengaktifkan akses dashboard.
+                    </p>
                   </div>
                 </div>
                 {pmErr && <p style={{ fontSize: 12, color: RED, margin: '0 0 10px' }}>{pmErr}</p>}
@@ -613,7 +720,7 @@ export default function AdminDashboard() {
                   border: 'none', borderRadius: 8, cursor: savingPm ? 'not-allowed' : 'pointer',
                   fontFamily: 'Inter, sans-serif',
                 }}>
-                  {savingPm ? 'Membuat akun...' : '+ Buat akun PM'}
+                  {savingPm ? 'Mengirim undangan...' : 'Kirim undangan PM'}
                 </button>
               </form>
             </div>
