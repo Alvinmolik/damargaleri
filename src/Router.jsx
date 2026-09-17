@@ -18,6 +18,7 @@ export default function Router() {
 
   const isAdminRoute = path === '/admin' || path.startsWith('/admin/')
   const slug = path.replace(/^\//, '').split('/')[0]
+  const isDemoRoute = slug === 'demo'
   const isClientRoute = slug && slug !== 'admin' && slug !== ''
 
   // Admin route — default deny. Only explicit admin roles may enter.
@@ -27,6 +28,9 @@ export default function Router() {
     if (!hasAdminAccess) return <div style={err}>Akses admin ditolak.</div>
     return <AdminDashboard />
   }
+
+  // Public read-only demo — /demo
+  if (isDemoRoute) return <App slug="demo" readOnly />
 
   // Client route — /slug
   if (isClientRoute) {
