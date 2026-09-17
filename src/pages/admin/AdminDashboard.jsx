@@ -49,6 +49,7 @@ export default function AdminDashboard() {
   const [inviteBusy, setInviteBusy] = useState(null)
   const [inviteMessage, setInviteMessage] = useState({})
   const [deleteBusy, setDeleteBusy] = useState(null)
+  const [templateBusy, setTemplateBusy] = useState(null)
 
   // New PM form
   const [pmForm, setPmForm]     = useState({ full_name:'', email:'', wa_number:'' })
@@ -174,6 +175,31 @@ export default function AdminDashboard() {
     return `${clean(bride)}-${clean(groom)}`
   }
 
+  async function applyStandardChecklist(project, replaceExisting = false) {
+    const { error } = await supabase.rpc('apply_checklist_template', {
+      target_project_id: project.id,
+      target_template_slug: 'damargaleri-standard-v1',
+      replace_existing: replaceExisting,
+    })
+    if (error) throw error
+  }
+
+  async function handleApplyTemplate(project) {
+    const confirmed = window.confirm(
+      `Terapkan Checklist Standar Damargaleri ke ${project.bride_name} & ${project.groom_name}?\n\nChecklist lama project ini akan diganti. Data budget, vendor, invoice, dokumen, dan akses client tidak ikut berubah.`
+    )
+    if (!confirmed) return
+    setTemplateBusy(project.id)
+    try {
+      await applyStandardChecklist(project, true)
+      await fetchProjects()
+    } catch (err) {
+      window.alert('Gagal menerapkan template: ' + err.message)
+    } finally {
+      setTemplateBusy(null)
+    }
+  }
+
   async function handleCreateProject(e) {
     e.preventDefault()
     if (!form.bride_name.trim() || !form.groom_name.trim()) {
@@ -223,69 +249,10 @@ export default function AdminDashboard() {
       }
     }
 
-    // Seed default checklist phases
-    const phases = [
-      { label: '12 bulan sebelum', sort_order: 1 },
-      { label: '9 bulan sebelum',  sort_order: 2 },
-      { label: '6 bulan sebelum',  sort_order: 3 },
-      { label: '3 bulan sebelum',  sort_order: 4 },
-      { label: '1 bulan sebelum',  sort_order: 5 },
-      { label: 'Hari H',           sort_order: 6 },
-    ]
-    const { data: phasesData } = await supabase
-      .from('checklist_phases')
-      .insert(phases.map(p => ({ ...p, project_id: project.id })))
-      .select()
-
-    // Seed default tasks per phase
-    const defaultTasks = {
-      0: [ // 12 bulan
-        { text: 'Tentukan tanggal & venue pernikahan', pic: 'Pasangan', location: '—' },
-        { text: 'Buat anggaran awal pernikahan', pic: 'Pasangan', location: '—' },
-        { text: 'Tentukan konsep & tema pernikahan', pic: 'Pasangan + WO', location: 'Kantor WO' },
-        { text: 'Buat daftar tamu kasar', pic: 'Pasangan', location: '—' },
-      ],
-      1: [ // 9 bulan
-        { text: 'Booking Wedding Organizer', pic: 'Pasangan', location: 'Kantor WO' },
-        { text: 'Booking fotografer & videografer', pic: 'WO', location: 'Studio foto' },
-        { text: 'Pilih & booking katering', pic: 'WO + Pasangan', location: 'Venue' },
-        { text: 'Cari inspirasi dekorasi & busana', pic: 'Pasangan', location: '—' },
-      ],
-      2: [ // 6 bulan
-        { text: 'Fitting gaun pengantin pertama', pic: 'Pengantin wanita', location: 'Butik busana' },
-        { text: 'Kirim save-the-date ke tamu', pic: 'Pasangan', location: '—' },
-        { text: 'Booking hiburan & entertainment', pic: 'WO', location: '—' },
-        { text: 'Tentukan tema undangan', pic: 'Pasangan + WO', location: 'Kantor WO' },
-      ],
-      3: [ // 3 bulan
-        { text: 'Kirim undangan resmi', pic: 'Pasangan + WO', location: '—' },
-        { text: 'Konfirmasi semua vendor', pic: 'WO', location: '—' },
-        { text: 'Fitting gaun pengantin kedua', pic: 'Pengantin wanita', location: 'Butik busana' },
-        { text: 'Buat rundown hari H detail', pic: 'WO', location: 'Kantor WO' },
-      ],
-      4: [ // 1 bulan
-        { text: 'Final headcount tamu', pic: 'Pasangan', location: '—' },
-        { text: 'Gladi bersih / rehearsal', pic: 'Semua', location: 'Venue' },
-        { text: 'Persiapkan amplop & souvenir', pic: 'Pasangan', location: '—' },
-        { text: 'Konfirmasi detail hari H ke semua', pic: 'WO', location: '—' },
-      ],
-      5: [ // Hari H
-        { text: 'Briefing tim WO & vendor pagi hari', pic: 'WO', location: 'Venue' },
-        { text: 'Persiapan pengantin — makeup & busana', pic: 'Pengantin wanita', location: 'Gedung rias' },
-        { text: 'Akad / pemberkatan nikah', pic: 'Semua', location: 'Venue' },
-        { text: 'Resepsi & penerimaan tamu', pic: 'Semua', location: 'Venue' },
-      ],
-    }
-
-    if (phasesData) {
-      const allTasks = phasesData.flatMap((phase, idx) =>
-        (defaultTasks[idx] || []).map((t, i) => ({
-          phase_id: phase.id, project_id: project.id,
-          text: t.text, pic: t.pic, location: t.location,
-          sort_order: i, done: false,
-        }))
-      )
-      await supabase.from('checklist_tasks').insert(allTasks)
+    try {
+      await applyStandardChecklist(project)
+    } catch (checklistError) {
+      setFormErr('Project dibuat, tetapi template checklist gagal diterapkan: ' + checklistError.message)
     }
 
     // Seed default budget categories
@@ -482,6 +449,17 @@ export default function AdminDashboard() {
                           </button>
                         )}
                       </div>
+
+                      {!p.checklist_template_slug && (
+                        <button onClick={() => handleApplyTemplate(p)}
+                          disabled={templateBusy === p.id}
+                          style={{ width:'100%', marginTop:8, padding:'7px 10px',
+                            fontSize:11, fontWeight:600, color:G700, background:WHITE,
+                            border:`1px dashed ${G500}`, borderRadius:7,
+                            cursor:templateBusy === p.id ? 'not-allowed' : 'pointer' }}>
+                          {templateBusy === p.id ? 'Menerapkan template...' : '＋ Terapkan Checklist Standar'}
+                        </button>
+                      )}
 
                       {p.slug !== 'demo' && (
                         <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${BORDER}` }}>
