@@ -48,6 +48,7 @@ export default function AdminDashboard() {
   const [inviteDrafts, setInviteDrafts] = useState({})
   const [inviteBusy, setInviteBusy] = useState(null)
   const [inviteMessage, setInviteMessage] = useState({})
+  const [deleteBusy, setDeleteBusy] = useState(null)
 
   // New PM form
   const [pmForm, setPmForm]     = useState({ full_name:'', email:'', wa_number:'' })
@@ -65,6 +66,7 @@ export default function AdminDashboard() {
     const { data } = await supabase
       .from('projects')
       .select('*, profiles!assigned_admin(full_name, wa_number), project_invitations(*)')
+      .neq('slug', 'demo')
       .order('created_at', { ascending: false })
     setProjects(data || [])
     setLoading(false)
@@ -147,6 +149,24 @@ export default function AdminDashboard() {
       client_name: draft.name?.trim() || '',
     })
     setInviteDrafts(p => ({ ...p, [project.id]: { name:'', email:'' } }))
+  }
+
+  async function handleDeleteProject(project) {
+    const projectName = `${project.bride_name} & ${project.groom_name}`
+    const confirmed = window.confirm(
+      `Hapus project ${projectName}?\n\nSemua checklist, budget, invoice, dokumen, vendor, akses client, dan file cover project ini akan ikut terhapus. Tindakan ini tidak dapat dibatalkan.`
+    )
+    if (!confirmed) return
+
+    setDeleteBusy(project.id)
+    try {
+      await invokeAccess({ action: 'delete_project', project_id: project.id })
+      await fetchProjects()
+    } catch (err) {
+      window.alert('Gagal menghapus project: ' + err.message)
+    } finally {
+      setDeleteBusy(null)
+    }
   }
 
   function generateSlug(bride, groom) {
@@ -451,6 +471,16 @@ export default function AdminDashboard() {
                           border: `1px solid ${G100}`, borderRadius: 6,
                           cursor: 'pointer', textDecoration: 'none', flexShrink: 0,
                         }}>Buka ↗</a>
+                        {isSupeadmin && (
+                          <button onClick={() => handleDeleteProject(p)}
+                            disabled={deleteBusy === p.id}
+                            style={{ fontSize:11, fontWeight:600, padding:'4px 10px',
+                              background:'#FFF5F4', color:RED, border:`1px solid #F2C7C2`,
+                              borderRadius:6, cursor:deleteBusy === p.id ? 'not-allowed' : 'pointer',
+                              flexShrink:0 }}>
+                            {deleteBusy === p.id ? 'Menghapus...' : 'Hapus'}
+                          </button>
+                        )}
                       </div>
 
                       {p.slug !== 'demo' && (
