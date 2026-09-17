@@ -43,9 +43,14 @@ export function AuthProvider({ children }) {
   }
 
   async function signInWithMagicLink(email) {
+    // Preserve the client page that requested the magic link.
+    // Previously this only used window.location.origin, so every client was
+    // returned to "/" and saw the admin entry point after signing in.
+    const redirectUrl = new URL(window.location.pathname, window.location.origin)
+
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: window.location.origin }
+      options: { emailRedirectTo: redirectUrl.toString() }
     })
     return { error }
   }
