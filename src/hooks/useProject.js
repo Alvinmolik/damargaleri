@@ -120,10 +120,67 @@ export function useProject(slug) {
     return { error }
   }
 
+  // ── Delete functions ───────────────────────────────────
+  async function deleteTask(taskId) {
+    const { error } = await supabase
+      .from('checklist_tasks')
+      .delete()
+      .eq('id', taskId)
+    if (!error) fetchProject()
+    return { error }
+  }
+
+  async function deleteBudgetCategory(id) {
+    const { error } = await supabase
+      .from('budget_categories')
+      .delete()
+      .eq('id', id)
+    if (!error) fetchProject()
+    return { error }
+  }
+
+  async function deleteInvoice(id) {
+    const { error } = await supabase
+      .from('invoices')
+      .delete()
+      .eq('id', id)
+    if (!error) fetchProject()
+    return { error }
+  }
+
+  async function deleteDocument(id) {
+    const { error } = await supabase
+      .from('documents')
+      .delete()
+      .eq('id', id)
+    if (!error) fetchProject()
+    return { error }
+  }
+
+  async function deleteVendor(id) {
+    const { error } = await supabase
+      .from('vendors')
+      .delete()
+      .eq('id', id)
+    if (!error) fetchProject()
+    return { error }
+  }
+
+  async function addVendor(vendor) {
+    const { error } = await supabase
+      .from('vendors')
+      .insert({ ...vendor, project_id: project.id })
+    if (!error) fetchProject()
+    return { error }
+  }
+
   return {
     project, loading, error, refetch: fetchProject,
-    toggleTask, addTask,
-    updateBudgetCategory, addBudgetCategory,
-    addInvoice, addDocument, updateCoverImage,
+    toggleTask, addTask, deleteTask,
+    updateBudgetCategory, addBudgetCategory, deleteBudgetCategory,
+    addInvoice, deleteInvoice,
+    addDocument, deleteDocument,
+    addVendor, deleteVendor,
+    updateCoverImage,
   }
 }

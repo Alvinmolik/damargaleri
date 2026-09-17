@@ -103,9 +103,12 @@ export default function App({slug}){
 
   const {
     project, loading, error,
-    toggleTask, addTask,
-    updateBudgetCategory, addBudgetCategory,
-    addInvoice, addDocument, updateCoverImage,
+    toggleTask, addTask, deleteTask,
+    updateBudgetCategory, addBudgetCategory, deleteBudgetCategory,
+    addInvoice, deleteInvoice,
+    addDocument, deleteDocument,
+    addVendor, deleteVendor,
+    updateCoverImage,
   } = useProject(pageSlug);
 
   // UI state
@@ -129,6 +132,10 @@ export default function App({slug}){
   const [budgetInput,setBudgetInput] = useState({cat:"",alloc:"",spent:""});
   const [budgetErr,setBudgetErr]   = useState("");
   const [vendorOpen,setVendorOpen] = useState(null);
+  const [showAddVendor,setShowAddVendor] = useState(false);
+  const [newVendor,setNewVendor]   = useState({category:"",name:"",contact:"",phone:"",instagram:"",price:"",status:"prospek",note:"",icon:"🏪"});
+  const [vendorErr,setVendorErr]   = useState("");
+  const [confirmDelete,setConfirmDelete] = useState(null); // {type, id, label}
   const [countdown,setCountdown]   = useState({d:0,h:0,m:0,s:0});
   const [copied,setCopied]         = useState(false);
   const coverRef = useRef();
@@ -252,6 +259,27 @@ export default function App({slug}){
     if(!error){setNewDoc({label:"",url:"",tag:"Dokumen"});setDocErr("");setShowAddDoc(false);}
   }
 
+  async function handleAddVendor(){
+    if(!newVendor.name.trim()){setVendorErr("Nama vendor tidak boleh kosong.");return;}
+    if(!newVendor.category.trim()){setVendorErr("Kategori tidak boleh kosong.");return;}
+    const{error}=await addVendor(newVendor);
+    if(!error){
+      setNewVendor({category:"",name:"",contact:"",phone:"",instagram:"",price:"",status:"prospek",note:"",icon:"🏪"});
+      setVendorErr("");setShowAddVendor(false);
+    }
+  }
+
+  async function handleDelete(){
+    if(!confirmDelete) return;
+    const {type, id} = confirmDelete;
+    if(type==="task") await deleteTask(id);
+    else if(type==="budget") await deleteBudgetCategory(id);
+    else if(type==="invoice") await deleteInvoice(id);
+    else if(type==="document") await deleteDocument(id);
+    else if(type==="vendor") await deleteVendor(id);
+    setConfirmDelete(null);
+  }
+
   async function handleCover(e){
     const f=e.target.files[0];
     if(!f)return;
@@ -295,20 +323,20 @@ export default function App({slug}){
         {/* ══ HOME ══ */}
         {tab==="home"&&(
           <div>
-            {/* Cover hero */}
-            <div style={{position:"relative",height:260,background:G900,overflow:"hidden"}}>
+            {/* Cover hero — full with countdown inside */}
+            <div style={{position:"relative",height:360,background:G900,overflow:"hidden"}}>
               <img src={coverImg} alt="Cover"
                 style={{width:"100%",height:"100%",objectFit:"cover",
                   objectPosition:`center ${coverPos}%`,
                   transition:"object-position .2s"}}
                 onError={e=>{e.target.src="/cover-default.jpg"}}/>
               <div style={{position:"absolute",inset:0,
-                background:"linear-gradient(to bottom, rgba(0,0,0,.05) 0%, rgba(27,67,50,.88) 100%)"}}/>
+                background:"linear-gradient(to bottom, rgba(0,0,0,.05) 0%, rgba(0,0,0,.15) 40%, rgba(27,67,50,.95) 100%)"}}/>
 
               {/* Edit mode */}
               {editingCover && (
                 <div style={{position:"absolute",inset:0,
-                  background:"rgba(0,0,0,.45)",
+                  background:"rgba(0,0,0,.55)",
                   display:"flex",flexDirection:"column",
                   alignItems:"center",justifyContent:"center",gap:16,
                   padding:"0 24px"}}>
@@ -338,7 +366,7 @@ export default function App({slug}){
                 </div>
               )}
 
-              {/* Normal buttons — only show when not editing */}
+              {/* Normal buttons */}
               {!editingCover && (
                 <div style={{position:"absolute",top:12,right:12,display:"flex",gap:8}}>
                   <button onClick={()=>setEditingCover(true)}
@@ -365,33 +393,30 @@ export default function App({slug}){
                 }}
                 style={{display:"none"}}/>
 
-              {/* Names — hidden during edit */}
+              {/* Names + countdown overlay at bottom */}
               {!editingCover && (
-                <div style={{position:"absolute",bottom:20,left:24,right:24}}>
-                  <p style={{fontSize:11,color:"rgba(255,255,255,.65)",
+                <div style={{position:"absolute",bottom:0,left:0,right:0,padding:"0 24px 20px"}}>
+                  <p style={{fontSize:11,color:"rgba(255,255,255,.7)",
                     margin:"0 0 3px",letterSpacing:".08em"}}>persiapan pernikahan</p>
-                  <h1 style={{fontFamily:"Lora,serif",fontSize:26,fontWeight:600,
+                  <h1 style={{fontFamily:"Lora,serif",fontSize:28,fontWeight:600,
                     color:WHITE,margin:"0 0 2px",lineHeight:1.2}}>{coupleNames}</h1>
-                  <p style={{fontSize:12,color:"rgba(255,255,255,.6)",margin:0}}>
+                  <p style={{fontSize:12,color:"rgba(255,255,255,.7)",margin:"0 0 16px"}}>
                     {weddingDate}{project.location?` · ${project.location}`:""}
                   </p>
+                  {/* Countdown inside cover */}
+                  <div style={{background:"rgba(0,0,0,.3)",borderRadius:12,
+                    padding:"12px 16px",display:"flex",justifyContent:"space-around",
+                    border:"0.5px solid rgba(255,255,255,.15)",backdropFilter:"blur(8px)"}}>
+                    {[["Hari",countdown.d],["Jam",countdown.h],["Menit",countdown.m],["Detik",countdown.s]].map(([l,v])=>(
+                      <div key={l} style={{textAlign:"center"}}>
+                        <p style={{fontFamily:"Lora,serif",fontSize:24,fontWeight:700,
+                          color:WHITE,margin:"0 0 2px",lineHeight:1}}>{String(v).padStart(2,"0")}</p>
+                        <p style={{fontSize:9,color:"rgba(255,255,255,.7)",margin:0,letterSpacing:".08em"}}>{l.toUpperCase()}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
-            </div>
-
-            {/* Countdown */}
-            <div style={{background:G900,padding:"0 20px 16px"}}>
-              <div style={{background:"rgba(255,255,255,.08)",borderRadius:12,
-                padding:"12px 16px",display:"flex",justifyContent:"space-around",
-                border:"0.5px solid rgba(255,255,255,.12)"}}>
-                {[["Hari",countdown.d],["Jam",countdown.h],["Menit",countdown.m],["Detik",countdown.s]].map(([l,v])=>(
-                  <div key={l} style={{textAlign:"center"}}>
-                    <p style={{fontFamily:"Lora,serif",fontSize:22,fontWeight:600,
-                      color:WHITE,margin:"0 0 2px",lineHeight:1}}>{String(v).padStart(2,"0")}</p>
-                    <p style={{fontSize:9,color:G200,margin:0,letterSpacing:".06em"}}>{l.toUpperCase()}</p>
-                  </div>
-                ))}
-              </div>
             </div>
 
             {/* Progress + budget */}
@@ -571,6 +596,12 @@ export default function App({slug}){
                                 )}
                               </div>
                             </div>
+                            <button
+                              onClick={e=>{e.stopPropagation();setConfirmDelete({type:"task",id:task.id,label:task.text});}}
+                              style={{padding:"4px 6px",background:"none",border:"none",
+                                cursor:"pointer",color:MUTED,fontSize:14,flexShrink:0,
+                                opacity:.5,lineHeight:1}}
+                              title="Hapus tugas">×</button>
                           </div>
                         </div>
                       ))}
@@ -710,6 +741,10 @@ export default function App({slug}){
                             style={{fontSize:11,padding:"4px 10px",borderRadius:20,
                               background:G50,color:G700,border:`0.5px solid ${G100}`,
                               cursor:"pointer",fontFamily:"Inter,sans-serif"}}>Edit</button>
+                          <button onClick={()=>setConfirmDelete({type:"budget",id:b.id,label:b.name})}
+                            style={{fontSize:11,padding:"4px 10px",borderRadius:20,
+                              background:"#FEF2F2",color:RED,border:`0.5px solid #FECACA`,
+                              cursor:"pointer",fontFamily:"Inter,sans-serif"}}>Hapus</button>
                         </div>
                       </div>
                       <div style={{height:4,borderRadius:2,background:BORDER,overflow:"hidden"}}>
@@ -901,13 +936,19 @@ export default function App({slug}){
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                           <p style={{fontSize:14,fontWeight:600,
                             color:inv.status==="lunas"?MUTED:DARK,margin:0}}>{inv.amount}</p>
-                          {inv.doc_url&&(
-                            <a href={inv.doc_url} target="_blank" rel="noreferrer"
-                              style={{fontSize:11,color:G700,fontWeight:500,
-                                textDecoration:"none",display:"flex",alignItems:"center",gap:4}}>
-                              📄 Lihat dokumen
-                            </a>
-                          )}
+                          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                            {inv.doc_url&&(
+                              <a href={inv.doc_url} target="_blank" rel="noreferrer"
+                                style={{fontSize:11,color:G700,fontWeight:500,
+                                  textDecoration:"none",display:"flex",alignItems:"center",gap:4}}>
+                                📄 Lihat dokumen
+                              </a>
+                            )}
+                            <button onClick={()=>setConfirmDelete({type:"invoice",id:inv.id,label:inv.label})}
+                              style={{fontSize:11,padding:"3px 8px",borderRadius:20,
+                                background:"#FEF2F2",color:RED,border:`0.5px solid #FECACA`,
+                                cursor:"pointer",fontFamily:"Inter,sans-serif"}}>Hapus</button>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -980,6 +1021,12 @@ export default function App({slug}){
                         <p style={{fontSize:13,fontWeight:500,color:DARK,margin:"0 0 2px"}}>{doc.label}</p>
                         <p style={{fontSize:11,color:G700,margin:0}}>Buka link →</p>
                       </div>
+                      <button onClick={e=>{e.preventDefault();setConfirmDelete({type:"document",id:doc.id,label:doc.label});}}
+                        style={{padding:"4px 8px",background:"#FEF2F2",color:RED,
+                          border:`0.5px solid #FECACA`,borderRadius:20,fontSize:11,
+                          cursor:"pointer",fontFamily:"Inter,sans-serif",flexShrink:0}}>
+                        Hapus
+                      </button>
                     </a>
                   ))}
                 </div>
@@ -997,8 +1044,88 @@ export default function App({slug}){
         {/* ══ VENDOR ══ */}
         {tab==="pernikahan"&&subPernikahan==="vendor"&&(
           <div>
-            <SH title="Vendor kami"
-              sub={`${vendors.filter(v=>v.status==="booking").length} vendor terkonfirmasi`}/>
+            <div style={{padding:"16px 20px 12px",display:"flex",
+              justifyContent:"space-between",alignItems:"center",
+              borderBottom:`0.5px solid ${BORDER}`}}>
+              <div>
+                <h2 style={{fontFamily:"Lora,serif",fontSize:20,fontWeight:600,
+                  color:DARK,margin:"0 0 2px",fontStyle:"italic"}}>Vendor kami</h2>
+                <p style={{fontSize:13,color:MUTED,margin:0}}>
+                  {vendors.filter(v=>v.status==="booking").length} vendor terkonfirmasi
+                </p>
+              </div>
+              <button onClick={()=>setShowAddVendor(p=>!p)}
+                style={{fontSize:12,padding:"6px 14px",borderRadius:20,
+                  background:showAddVendor?BORDER:G900,color:showAddVendor?DARK:WHITE,
+                  border:"none",cursor:"pointer",fontFamily:"Inter,sans-serif"}}>
+                {showAddVendor?"Batal":"+ Tambah"}
+              </button>
+            </div>
+
+            {/* Add vendor form */}
+            {showAddVendor&&(
+              <div style={{padding:"12px 20px 16px",background:G50,
+                borderBottom:`0.5px solid ${BORDER}`}}>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                  <div>
+                    <p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>Nama vendor</p>
+                    <input value={newVendor.name} placeholder="mis. Rizkha Photography"
+                      onChange={e=>setNewVendor(p=>({...p,name:e.target.value}))}
+                      style={inp()}/>
+                  </div>
+                  <div>
+                    <p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>Kategori</p>
+                    <input value={newVendor.category} placeholder="mis. Fotografer"
+                      onChange={e=>setNewVendor(p=>({...p,category:e.target.value}))}
+                      style={inp()}/>
+                  </div>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                  <div>
+                    <p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>Nomor WA</p>
+                    <input value={newVendor.phone} placeholder="628xxxxxxxxx"
+                      onChange={e=>setNewVendor(p=>({...p,phone:e.target.value}))}
+                      style={inp()}/>
+                  </div>
+                  <div>
+                    <p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>Harga</p>
+                    <input value={newVendor.price} placeholder="mis. Rp 8.500.000"
+                      onChange={e=>setNewVendor(p=>({...p,price:e.target.value}))}
+                      style={inp()}/>
+                  </div>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                  <div>
+                    <p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>PIC / Kontak</p>
+                    <input value={newVendor.contact} placeholder="Nama PIC"
+                      onChange={e=>setNewVendor(p=>({...p,contact:e.target.value}))}
+                      style={inp()}/>
+                  </div>
+                  <div>
+                    <p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>Status</p>
+                    <select value={newVendor.status}
+                      onChange={e=>setNewVendor(p=>({...p,status:e.target.value}))}
+                      style={{...inp(),appearance:"none"}}>
+                      {["prospek","negosiasi","booking"].map(s=>(
+                        <option key={s}>{s}</option>))}
+                    </select>
+                  </div>
+                </div>
+                <div style={{marginBottom:8}}>
+                  <p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>Catatan</p>
+                  <input value={newVendor.note} placeholder="Detail kesepakatan, catatan penting..."
+                    onChange={e=>setNewVendor(p=>({...p,note:e.target.value}))}
+                    style={inp()}/>
+                </div>
+                {vendorErr&&<p style={{fontSize:11,color:RED,margin:"0 0 8px"}}>{vendorErr}</p>}
+                <button onClick={handleAddVendor}
+                  style={{width:"100%",padding:"9px 0",fontSize:13,fontWeight:500,
+                    background:G900,color:WHITE,border:"none",borderRadius:8,
+                    cursor:"pointer",fontFamily:"Inter,sans-serif"}}>Simpan vendor</button>
+              </div>
+            )}
+
+            {/* Summary */}
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,
               padding:"14px 20px",borderBottom:`0.5px solid ${BORDER}`,background:WHITE}}>
               {[
@@ -1012,9 +1139,10 @@ export default function App({slug}){
                 </div>
               ))}
             </div>
-            {vendors.length===0&&(
+
+            {vendors.length===0&&!showAddVendor&&(
               <p style={{fontSize:13,color:MUTED,textAlign:"center",padding:"32px 0"}}>
-                Belum ada vendor. WO akan menambahkan vendor untuk kamu.
+                Belum ada vendor. Klik "+ Tambah" untuk menambahkan.
               </p>
             )}
             {vendors.map(v=>{
@@ -1068,15 +1196,23 @@ export default function App({slug}){
                           <span style={{fontSize:12,fontWeight:500,color:r.accent?G700:DARK}}>{r.val}</span>
                         </div>
                       ))}
-                      {v.phone&&(
-                        <a href={`https://wa.me/${v.phone.replace(/\D/g,"")}`}
-                          target="_blank" rel="noreferrer"
-                          style={{display:"flex",alignItems:"center",justifyContent:"center",
-                            gap:8,marginTop:12,padding:"10px 0",fontSize:13,fontWeight:600,
-                            background:G900,color:WHITE,borderRadius:10,textDecoration:"none"}}>
-                          Hubungi {(v.contact||"vendor").split(" ")[0]}
-                        </a>
-                      )}
+                      <div style={{display:"flex",gap:8,marginTop:12}}>
+                        {v.phone&&(
+                          <a href={`https://wa.me/${v.phone.replace(/\D/g,"")}`}
+                            target="_blank" rel="noreferrer"
+                            style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",
+                              gap:8,padding:"10px 0",fontSize:13,fontWeight:600,
+                              background:G900,color:WHITE,borderRadius:10,textDecoration:"none"}}>
+                            Hubungi {(v.contact||"vendor").split(" ")[0]}
+                          </a>
+                        )}
+                        <button onClick={()=>setConfirmDelete({type:"vendor",id:v.id,label:v.name})}
+                          style={{padding:"10px 14px",fontSize:12,fontWeight:600,
+                            background:"#FEF2F2",color:RED,border:`1px solid #FECACA`,
+                            borderRadius:10,cursor:"pointer",fontFamily:"Inter,sans-serif"}}>
+                          Hapus
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1155,6 +1291,29 @@ export default function App({slug}){
           </div>
         )}
       </div>
+
+      {/* Delete confirmation modal */}
+      {confirmDelete&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",
+          zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+          <div style={{background:WHITE,borderRadius:16,padding:24,width:"100%",maxWidth:320}}>
+            <p style={{fontSize:15,fontWeight:600,color:DARK,margin:"0 0 8px"}}>Hapus item ini?</p>
+            <p style={{fontSize:13,color:MUTED,margin:"0 0 20px",lineHeight:1.5}}>
+              <strong>{confirmDelete.label}</strong> akan dihapus permanen dan tidak bisa dikembalikan.
+            </p>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>setConfirmDelete(null)}
+                style={{flex:1,padding:"10px 0",fontSize:13,background:"none",
+                  border:`1px solid ${BORDER}`,borderRadius:10,cursor:"pointer",
+                  color:MUTED,fontFamily:"Inter,sans-serif"}}>Batal</button>
+              <button onClick={handleDelete}
+                style={{flex:1,padding:"10px 0",fontSize:13,fontWeight:600,
+                  background:RED,color:WHITE,border:"none",borderRadius:10,
+                  cursor:"pointer",fontFamily:"Inter,sans-serif"}}>Hapus</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bottom nav */}
       <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",
