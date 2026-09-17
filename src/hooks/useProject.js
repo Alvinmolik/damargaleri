@@ -64,9 +64,30 @@ export function useProject(slug, readOnly = false) {
         project_id: project.id,
         text: task.text,
         pic: task.pic || 'Pasangan',
+        responsibility: task.pic || 'Pasangan',
+        location: task.loc || '—',
+        due_date: task.due_date || null,
+        status: 'belum_dimulai',
+        visible_to_client: true,
+        client_can_edit: true,
+      })
+    if (!error) fetchProject()
+    return { error }
+  }
+
+  async function updateTask(taskId, task) {
+    if (readOnly) return rejectReadOnly()
+    const { error } = await supabase
+      .from('checklist_tasks')
+      .update({
+        text: task.text,
+        details: task.details || null,
+        pic: task.pic || 'Pasangan',
+        responsibility: task.pic || 'Pasangan',
         location: task.loc || '—',
         due_date: task.due_date || null,
       })
+      .eq('id', taskId)
     if (!error) fetchProject()
     return { error }
   }
@@ -192,7 +213,7 @@ export function useProject(slug, readOnly = false) {
   return {
     project, loading, error, refetch: fetchProject,
     updateProject,
-    toggleTask, addTask, deleteTask,
+    toggleTask, addTask, updateTask, deleteTask,
     updateBudgetCategory, addBudgetCategory, deleteBudgetCategory,
     addInvoice, updateInvoice, deleteInvoice,
     addDocument, updateDocument, deleteDocument,
