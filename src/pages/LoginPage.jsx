@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
+import { supabase } from '../lib/supabase'
 
 const G900 = '#1B4332', G700 = '#2D6A4F', G100 = '#D8F3DC', G50 = '#F0FAF3'
 const DARK = '#1C1C1E', MUTED = '#8A8A8E', BORDER = '#E2EDE6', WHITE = '#FFFFFF', RED = '#C0392B'
@@ -11,6 +12,7 @@ export default function LoginPage({ mode = 'admin' }) {
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
   const [magicSent, setMagicSent] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
 
   const isAdmin = mode === 'admin'
 
@@ -27,6 +29,17 @@ export default function LoginPage({ mode = 'admin' }) {
       if (error) setError('Gagal kirim link. Coba lagi.')
       else setMagicSent(true)
     }
+    setLoading(false)
+  }
+
+  async function handleForgotPassword() {
+    if (!email.trim()) { setError('Isi email PM terlebih dahulu.'); return }
+    setLoading(true); setError(''); setResetSent(false)
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/admin/setup-password?recovery=1`,
+    })
+    if (resetError) setError('Gagal mengirim email reset password.')
+    else setResetSent(true)
     setLoading(false)
   }
 
@@ -99,6 +112,8 @@ export default function LoginPage({ mode = 'admin' }) {
               <p style={{ fontSize: 12, color: RED, margin: '0 0 12px' }}>{error}</p>
             )}
 
+            {resetSent && <p style={{ fontSize:12, color:G700, margin:'0 0 12px' }}>Link membuat ulang password sudah dikirim. Silakan cek email.</p>}
+
             <button
               type="submit" disabled={loading}
               style={{
@@ -110,6 +125,13 @@ export default function LoginPage({ mode = 'admin' }) {
             >
               {loading ? 'Memproses...' : isAdmin ? 'Masuk' : 'Kirim link masuk'}
             </button>
+
+            {isAdmin && (
+              <button type="button" onClick={handleForgotPassword} disabled={loading}
+                style={{ width:'100%', marginTop:10, padding:0, border:0, background:'none', color:G700, fontSize:12, cursor:'pointer' }}>
+                Lupa password?
+              </button>
+            )}
 
             {!isAdmin && (
               <p style={{ fontSize: 12, color: MUTED, textAlign: 'center', margin: '14px 0 0', lineHeight: 1.6 }}>
