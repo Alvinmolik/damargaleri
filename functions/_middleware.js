@@ -16,24 +16,13 @@ function replaceMeta(html, attribute, key, value) {
   return pattern.test(html) ? html.replace(pattern, tag) : html.replace('</head>', `  ${tag}\n  </head>`)
 }
 
-async function getProjectMetadata(env, slug) {
-  const supabaseUrl = env.VITE_SUPABASE_URL
-  const anonKey = env.VITE_SUPABASE_ANON_KEY
-  if (!supabaseUrl || !anonKey) return null
-
+async function getProjectMetadata(slug) {
   try {
-    const response = await fetch(`${supabaseUrl}/rest/v1/rpc/get_project_share_metadata`, {
-      method: 'POST',
-      headers: {
-        apikey: anonKey,
-        Authorization: `Bearer ${anonKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ p_slug: slug }),
-    })
+    const endpoint = new URL('https://wowosbdyhpxgwatrwlvo.supabase.co/functions/v1/share-metadata')
+    endpoint.searchParams.set('slug', slug)
+    const response = await fetch(endpoint, { headers: { Accept: 'application/json' } })
     if (!response.ok) return null
-    const rows = await response.json()
-    return Array.isArray(rows) ? rows[0] ?? null : rows
+    return await response.json()
   } catch {
     return null
   }
@@ -54,7 +43,7 @@ export async function onRequest(context) {
   let image = fallbackImage
 
   if (isProjectPage) {
-    const project = await getProjectMetadata(context.env, slug)
+    const project = await getProjectMetadata(slug)
     if (project) {
       const couple = `${project.bride_name} & ${project.groom_name}`
       title = `${couple} — Damargaleri Organizer`
