@@ -466,7 +466,7 @@ export default function App({slug,readOnly=false}){
                   padding:"9px 6px",fontSize:11,fontWeight:600,borderRadius:10,
                   border:`1px solid ${checklistModule===id?G700:BORDER}`,
                   color:checklistModule===id?"#fff":G700,
-                  background:checklistModule===id?G700:WHITE,cursor:"pointer",
+                  background:checklistModule===id?G700:CARD,cursor:"pointer",
                 }}>{icon} {label}</button>
               ))}
             </div>
