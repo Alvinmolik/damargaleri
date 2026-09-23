@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from './hooks/useAuth.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import AdminDashboard from './pages/admin/AdminDashboard.jsx'
+import SetPasswordPage from './pages/admin/SetPasswordPage.jsx'
 import App from './App.jsx'
 
 export default function Router() {
@@ -17,6 +18,7 @@ export default function Router() {
   if (loading) return <LoadingScreen />
 
   const isAdminRoute = path === '/admin' || path.startsWith('/admin/')
+  const isPasswordSetup = path === '/admin/setup-password'
   const slug = path.replace(/^\//, '').split('/')[0]
   const isDemoRoute = slug === 'demo'
   const isClientRoute = slug && slug !== 'admin' && slug !== ''
@@ -24,6 +26,7 @@ export default function Router() {
   // Admin route — default deny. Only explicit admin roles may enter.
   if (isAdminRoute) {
     if (!user) return <LoginPage mode="admin" />
+    if (isPasswordSetup) return <SetPasswordPage />
     const hasAdminAccess = profile?.role === 'admin' || profile?.role === 'superadmin'
     if (!hasAdminAccess) return <div style={err}>Akses admin ditolak.</div>
     return <AdminDashboard />
