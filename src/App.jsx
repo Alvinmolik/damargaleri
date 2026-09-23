@@ -140,7 +140,7 @@ export default function App({slug,readOnly=false}){
   const [budgetErr,setBudgetErr]=useState("");
   const [vendorOpen,setVendorOpen]=useState(null);
   const [showAddVendor,setShowAddVendor]=useState(false);
-  const [newVendor,setNewVendor]=useState({category:"",name:"",contact:"",phone:"",instagram:"",price:"",status:"prospek",note:"",icon:"🏪"});
+  const [newVendor,setNewVendor]=useState({category:"",budget_category_id:"",name:"",contact:"",phone:"",instagram:"",contract_amount:"",paid_amount:"",status:"prospek",note:"",icon:"🏪"});
   const [vendorErr,setVendorErr]=useState("");
   const [editVendorId,setEditVendorId]=useState(null);
   const [editVendorData,setEditVendorData]=useState({});
@@ -201,7 +201,10 @@ export default function App({slug,readOnly=false}){
   const allTasks=phases.flatMap(p=>(p.checklist_tasks||[]).map(t=>({...t,done:localDone[t.id]!==undefined?localDone[t.id]:t.done})));
   const doneCount=allTasks.filter(t=>t.done).length;
   const pct=allTasks.length?Math.round((doneCount/allTasks.length)*100):0;
-  const totalSpent=budget.reduce((s,b)=>s+Number(b.spent||0),0);
+  const vendorCommitted=vendors.filter(v=>v.status==="booking").reduce((s,v)=>s+Number(v.contract_amount||0),0);
+  const vendorPaid=vendors.reduce((s,v)=>s+Number(v.paid_amount||0),0);
+  const manualSpent=budget.reduce((s,b)=>s+Number(b.spent||0),0);
+  const totalSpent=manualSpent+vendorPaid;
   const budgetTotal=Number(project.budget_total)||budget.reduce((s,b)=>s+Number(b.allocated||0),0)||1;
   const budgetPct=Math.round((totalSpent/budgetTotal)*100);
 
@@ -264,11 +267,22 @@ export default function App({slug,readOnly=false}){
   async function handleAddVendor(){
     if(!newVendor.name.trim()){setVendorErr("Nama vendor wajib diisi.");return;}
     if(!newVendor.category.trim()){setVendorErr("Kategori wajib diisi.");return;}
-    await addVendor(newVendor);
-    setNewVendor({category:"",name:"",contact:"",phone:"",instagram:"",price:"",status:"prospek",note:"",icon:"🏪"});setVendorErr("");setShowAddVendor(false);
+    const contractAmount=parseInt(String(newVendor.contract_amount).replace(/\D/g,""))||0;
+    const paidAmount=parseInt(String(newVendor.paid_amount).replace(/\D/g,""))||0;
+    if(paidAmount>contractAmount){setVendorErr("Jumlah dibayar tidak boleh melebihi nilai kontrak.");return;}
+    const {error}=await addVendor({...newVendor,contract_amount:contractAmount,paid_amount:paidAmount,budget_category_id:newVendor.budget_category_id||null});
+    if(error){setVendorErr(error.message);return;}
+    setNewVendor({category:"",budget_category_id:"",name:"",contact:"",phone:"",instagram:"",contract_amount:"",paid_amount:"",status:"prospek",note:"",icon:"🏪"});setVendorErr("");setShowAddVendor(false);
   }
   async function handleSaveVendor(id){
-    await updateVendor(id,editVendorData);setEditVendorId(null);setEditVendorData({});
+    const payload={...editVendorData};
+    payload.contract_amount=parseInt(String(payload.contract_amount??0).replace(/\D/g,""))||0;
+    payload.paid_amount=parseInt(String(payload.paid_amount??0).replace(/\D/g,""))||0;
+    payload.budget_category_id=payload.budget_category_id||null;
+    if(payload.paid_amount>payload.contract_amount){setVendorErr("Jumlah dibayar tidak boleh melebihi nilai kontrak.");return;}
+    const {error}=await updateVendor(id,payload);
+    if(error){setVendorErr(error.message);return;}
+    setVendorErr("");setEditVendorId(null);setEditVendorData({});
   }
   async function handleDelete(){
     if(!confirmDelete)return;
@@ -292,10 +306,10 @@ export default function App({slug,readOnly=false}){
   const SLabel=({t})=><p style={{fontSize:10,fontWeight:700,color:MUTED,letterSpacing:".1em",textTransform:"uppercase",margin:"0 0 10px"}}>{t}</p>;
 
   const TABS=[
-    {id:"home",label:"Beranda",d:"M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5zM9 21V12h6v9"},
-    {id:"persiapan",label:"Persiapan",d:"M9 12l2 2 4-4M5 5h14a1 1 0 011 1v12a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z"},
-    {id:"pernikahan",label:"Pernikahan",d:"M12 21.7C5.8 21.7 1 17 1 12s4.8-9.7 11-9.7 11 4.3 11 9.7-4.8 9.7-11 9.7z"},
-    {id:"info",label:"Info",d:"M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"},
+    {id:"home",label:"Beranda",d:"M3 10.5 12 3l9 7.5M5 9.5V21h14V9.5M9 21v-7h6v7"},
+    {id:"persiapan",label:"Persiapan",d:"M9 11l2 2 4-4M6 3h12a2 2 0 0 1 2 2v16H4V5a2 2 0 0 1 2-2z"},
+    {id:"pernikahan",label:"Pernikahan",d:"M7.5 12.5 12 17l4.5-4.5a3.2 3.2 0 0 0-4.5-4.5 3.2 3.2 0 0 0-4.5 4.5zM9.5 5.5 12 2l2.5 3.5"},
+    {id:"info",label:"Info",d:"M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 10v7M12 7h.01"},
   ];
 
   return(
@@ -559,7 +573,7 @@ export default function App({slug,readOnly=false}){
         {tab==="persiapan"&&subP==="budget"&&(
           <div style={{padding:"16px 16px 0"}}>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:12}}>
-              {[{label:"Total Anggaran",val:fmt(budgetTotal)},{label:"Terpakai",val:fmt(totalSpent),accent:true},{label:"Sisa",val:fmt(budgetTotal-totalSpent),neg:budgetTotal-totalSpent<0}].map((c,i)=>(
+              {[{label:"Total Anggaran",val:fmt(budgetTotal)},{label:"Sudah Dibayar",val:fmt(totalSpent),accent:true},{label:"Sisa Kas",val:fmt(budgetTotal-totalSpent),neg:budgetTotal-totalSpent<0}].map((c,i)=>(
                 <div key={i} style={{...card({padding:"10px 12px"})}}>
                   <p style={{fontSize:9,color:MUTED,margin:"0 0 3px",textTransform:"uppercase",letterSpacing:".05em"}}>{c.label}</p>
                   <p style={{fontSize:11,fontWeight:700,color:c.neg?RED:c.accent?G700:DARK,margin:0,lineHeight:1.2}}>{c.val}</p>
@@ -571,6 +585,11 @@ export default function App({slug,readOnly=false}){
             </div>
             <p style={{fontSize:10,color:MUTED,textAlign:"right",margin:"0 0 12px"}}>{budgetPct}% terpakai</p>
 
+            <div style={{...card({padding:"12px 14px"}),marginBottom:12,display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              <div><p style={{fontSize:9,color:MUTED,margin:"0 0 3px",textTransform:"uppercase"}}>Kontrak vendor booking</p><p style={{fontSize:13,fontWeight:700,color:DARK,margin:0}}>{fmt(vendorCommitted)}</p></div>
+              <div><p style={{fontSize:9,color:MUTED,margin:"0 0 3px",textTransform:"uppercase"}}>Pembayaran vendor</p><p style={{fontSize:13,fontWeight:700,color:G700,margin:0}}>{fmt(vendorPaid)}</p></div>
+            </div>
+
             {budget.filter(b=>Number(b.allocated)>0).length>0&&(
               <div style={{...card(),marginBottom:12}}>
                 <SLabel t="Distribusi Anggaran"/>
@@ -579,8 +598,12 @@ export default function App({slug,readOnly=false}){
             )}
 
             {budget.map(b=>{
-              const over=Number(b.spent)>Number(b.allocated);
-              const catPct=Number(b.allocated)>0?Math.round((Number(b.spent)/Number(b.allocated))*100):0;
+              const linkedVendors=vendors.filter(v=>v.budget_category_id===b.id);
+              const vendorCatCommitted=linkedVendors.filter(v=>v.status==="booking").reduce((s,v)=>s+Number(v.contract_amount||0),0);
+              const vendorCatPaid=linkedVendors.reduce((s,v)=>s+Number(v.paid_amount||0),0);
+              const categoryPaid=Number(b.spent||0)+vendorCatPaid;
+              const over=categoryPaid>Number(b.allocated);
+              const catPct=Number(b.allocated)>0?Math.round((categoryPaid/Number(b.allocated))*100):0;
               const isEdit=editBudget===b.id;
               return(
                 <div key={b.id} style={{...card(),marginBottom:10}}>
@@ -604,7 +627,8 @@ export default function App({slug,readOnly=false}){
                           <span style={{fontSize:20}}>{b.icon||"💸"}</span>
                           <div>
                             <p style={{fontSize:13,fontWeight:500,color:DARK,margin:"0 0 1px"}}>{b.name}</p>
-                            <p style={{fontSize:11,color:MUTED,margin:0}}>{fmt(b.spent)} dari {fmt(b.allocated)}</p>
+                            <p style={{fontSize:11,color:MUTED,margin:0}}>Dibayar {fmt(categoryPaid)} dari {fmt(b.allocated)}</p>
+                            {linkedVendors.length>0&&<p style={{fontSize:10,color:G700,margin:"2px 0 0"}}>{linkedVendors.length} vendor · kontrak booking {fmt(vendorCatCommitted)}</p>}
                           </div>
                         </div>
                         <div style={{display:"flex",gap:6}}>
@@ -867,16 +891,18 @@ export default function App({slug,readOnly=false}){
                   <div><p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>Nama vendor</p><input value={newVendor.name} onChange={e=>setNewVendor(p=>({...p,name:e.target.value}))} style={inp()}/></div>
                   <div><p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>Kategori</p><input value={newVendor.category} onChange={e=>setNewVendor(p=>({...p,category:e.target.value}))} style={inp()}/></div>
                 </div>
+                <div style={{marginBottom:8}}><p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>Masuk ke kategori budget</p><select value={newVendor.budget_category_id} onChange={e=>setNewVendor(p=>({...p,budget_category_id:e.target.value}))} style={{...inp(),appearance:"none"}}><option value="">— Pilih kategori budget —</option>{budget.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
                   <div><p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>Nomor WA</p><input value={newVendor.phone} onChange={e=>setNewVendor(p=>({...p,phone:e.target.value}))} style={inp()}/></div>
-                  <div><p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>Harga</p><input value={newVendor.price} onChange={e=>setNewVendor(p=>({...p,price:e.target.value}))} style={inp()}/></div>
+                  <div><p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>Nilai kontrak (Rp)</p><input inputMode="numeric" value={newVendor.contract_amount} onChange={e=>setNewVendor(p=>({...p,contract_amount:e.target.value}))} style={inp()}/></div>
                 </div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-                  <div><p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>PIC</p><input value={newVendor.contact} onChange={e=>setNewVendor(p=>({...p,contact:e.target.value}))} style={inp()}/></div>
+                  <div><p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>Sudah dibayar / DP (Rp)</p><input inputMode="numeric" value={newVendor.paid_amount} onChange={e=>setNewVendor(p=>({...p,paid_amount:e.target.value}))} style={inp()}/></div>
                   <div><p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>Status</p>
                     <select value={newVendor.status} onChange={e=>setNewVendor(p=>({...p,status:e.target.value}))} style={{...inp(),appearance:"none"}}>{["prospek","negosiasi","booking"].map(s=><option key={s}>{s}</option>)}</select>
                   </div>
                 </div>
+                <div style={{marginBottom:8}}><p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>PIC</p><input value={newVendor.contact} onChange={e=>setNewVendor(p=>({...p,contact:e.target.value}))} style={inp()}/></div>
                 <div style={{marginBottom:8}}><p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>Catatan</p><input value={newVendor.note} onChange={e=>setNewVendor(p=>({...p,note:e.target.value}))} style={inp()}/></div>
                 {vendorErr&&<p style={{fontSize:11,color:RED,margin:"0 0 8px"}}>{vendorErr}</p>}
                 <button onClick={handleAddVendor} style={{width:"100%",padding:"10px",fontSize:13,fontWeight:600,background:G900,color:"#fff",border:"none",borderRadius:12,cursor:"pointer"}}>Simpan vendor</button>
@@ -893,7 +919,11 @@ export default function App({slug,readOnly=false}){
                     <div>
                       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
                         <div><p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>Nama</p><input value={editVendorData.name??v.name} onChange={e=>setEditVendorData(p=>({...p,name:e.target.value}))} style={inp()}/></div>
-                        <div><p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>Harga</p><input value={editVendorData.price??v.price??""} onChange={e=>setEditVendorData(p=>({...p,price:e.target.value}))} style={inp()}/></div>
+                        <div><p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>Nilai kontrak</p><input value={editVendorData.contract_amount??v.contract_amount??""} onChange={e=>setEditVendorData(p=>({...p,contract_amount:e.target.value}))} style={inp()}/></div>
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                        <div><p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>Sudah dibayar / DP</p><input value={editVendorData.paid_amount??v.paid_amount??""} onChange={e=>setEditVendorData(p=>({...p,paid_amount:e.target.value}))} style={inp()}/></div>
+                        <div><p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>Kategori budget</p><select value={editVendorData.budget_category_id??v.budget_category_id??""} onChange={e=>setEditVendorData(p=>({...p,budget_category_id:e.target.value}))} style={{...inp(),appearance:"none"}}><option value="">— Belum dipilih —</option>{budget.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
                       </div>
                       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
                         <div><p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>WA</p><input value={editVendorData.phone??v.phone??""} onChange={e=>setEditVendorData(p=>({...p,phone:e.target.value}))} style={inp()}/></div>
@@ -902,6 +932,7 @@ export default function App({slug,readOnly=false}){
                         </div>
                       </div>
                       <div style={{marginBottom:8}}><p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>Catatan</p><input value={editVendorData.note??v.note??""} onChange={e=>setEditVendorData(p=>({...p,note:e.target.value}))} style={inp()}/></div>
+                      {vendorErr&&<p style={{fontSize:11,color:RED,margin:"0 0 8px"}}>{vendorErr}</p>}
                       <div style={{display:"flex",gap:8}}>
                         <button onClick={()=>handleSaveVendor(v.id)} style={{flex:1,padding:"9px",fontSize:12,fontWeight:600,background:G900,color:"#fff",border:"none",borderRadius:10,cursor:"pointer"}}>Simpan</button>
                         <button onClick={()=>{setEditVendorId(null);setEditVendorData({});}} style={{padding:"9px 14px",fontSize:12,background:"none",border:`1.5px solid ${BORDER2}`,borderRadius:10,cursor:"pointer",color:MUTED}}>Batal</button>
@@ -919,13 +950,14 @@ export default function App({slug,readOnly=false}){
                           <p style={{fontSize:11,color:MUTED,margin:0}}>{v.category}</p>
                         </div>
                         <div style={{textAlign:"right",flexShrink:0}}>
-                          <p style={{fontSize:13,fontWeight:600,color:G700,margin:"0 0 1px"}}>{v.price||"—"}</p>
+                          <p style={{fontSize:13,fontWeight:600,color:G700,margin:"0 0 1px"}}>{Number(v.contract_amount)>0?fmt(v.contract_amount):(v.price||"—")}</p>
                           <span style={{fontSize:10,color:MUTED,display:"inline-block",transform:isOpen?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</span>
                         </div>
                       </button>
                       {isOpen&&(
                         <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${BORDER}`}} className="fade-up">
                           {v.note&&<div style={{background:G50,borderRadius:10,padding:"10px 12px",marginBottom:10}}><p style={{fontSize:11,color:G700,fontWeight:600,margin:"0 0 3px"}}>CATATAN</p><p style={{fontSize:12,color:MID,margin:0,lineHeight:1.6}}>{v.note}</p></div>}
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}><div style={{background:"#FAFAFA",borderRadius:9,padding:9}}><p style={{fontSize:9,color:MUTED,margin:"0 0 2px"}}>NILAI KONTRAK</p><p style={{fontSize:12,fontWeight:600,margin:0}}>{fmt(v.contract_amount||0)}</p></div><div style={{background:G50,borderRadius:9,padding:9}}><p style={{fontSize:9,color:G700,margin:"0 0 2px"}}>SUDAH DIBAYAR</p><p style={{fontSize:12,fontWeight:600,color:G700,margin:0}}>{fmt(v.paid_amount||0)}</p></div></div>
                           {[{label:"PIC",val:v.contact},{label:"WhatsApp",val:v.phone,accent:true},{label:"Instagram",val:v.instagram,accent:true}].filter(r=>r.val).map((r,i,arr)=>(
                             <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:i<arr.length-1?`1px solid ${BORDER}`:"none"}}>
                               <span style={{fontSize:12,color:MUTED}}>{r.label}</span>
@@ -934,7 +966,7 @@ export default function App({slug,readOnly=false}){
                           ))}
                           <div style={{display:"flex",gap:8,marginTop:12}}>
                             {v.phone&&<a href={`https://wa.me/${v.phone.replace(/\D/g,"")}`} target="_blank" rel="noreferrer" style={{flex:1,padding:"9px 0",fontSize:12,fontWeight:600,background:G900,color:"#fff",borderRadius:10,textDecoration:"none",textAlign:"center",display:"block"}}>Hubungi {(v.contact||"vendor").split(" ")[0]}</a>}
-                            <button onClick={()=>{setEditVendorId(v.id);setEditVendorData({name:v.name,price:v.price||"",phone:v.phone||"",status:v.status,note:v.note||""});}} style={{padding:"9px 12px",fontSize:12,fontWeight:600,background:G50,color:G700,border:`1px solid ${G100}`,borderRadius:10,cursor:"pointer"}}>Edit</button>
+                            <button onClick={()=>{setVendorErr("");setEditVendorId(v.id);setEditVendorData({name:v.name,contract_amount:String(v.contract_amount||0),paid_amount:String(v.paid_amount||0),budget_category_id:v.budget_category_id||"",phone:v.phone||"",status:v.status,note:v.note||""});}} style={{padding:"9px 12px",fontSize:12,fontWeight:600,background:G50,color:G700,border:`1px solid ${G100}`,borderRadius:10,cursor:"pointer"}}>Edit</button>
                             <button onClick={()=>setConfirmDelete({type:"vendor",id:v.id,label:v.name})} style={{padding:"9px 12px",fontSize:12,fontWeight:600,background:"#FEF2F2",color:RED,border:"1px solid #FECACA",borderRadius:10,cursor:"pointer"}}>Hapus</button>
                           </div>
                         </div>
