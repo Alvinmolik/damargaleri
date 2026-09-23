@@ -50,6 +50,10 @@ export default function AdminDashboard() {
   const [inviteMessage, setInviteMessage] = useState({})
   const [deleteBusy, setDeleteBusy] = useState(null)
   const [templateBusy, setTemplateBusy] = useState(null)
+  const [editingProject, setEditingProject] = useState(null)
+  const [editForm, setEditForm] = useState(null)
+  const [editBusy, setEditBusy] = useState(false)
+  const [editErr, setEditErr] = useState('')
 
   // New PM form
   const [pmForm, setPmForm]     = useState({ full_name:'', email:'', wa_number:'' })
@@ -168,6 +172,35 @@ export default function AdminDashboard() {
     } finally {
       setDeleteBusy(null)
     }
+  }
+
+  function startEditProject(project) {
+    setEditingProject(project)
+    setEditErr('')
+    setEditForm({
+      bride_name: project.bride_name || '', groom_name: project.groom_name || '',
+      wedding_date: project.wedding_date || '', venue: project.venue || '',
+      location: project.location || '', guest_count: project.guest_count || '',
+      budget_total: String(project.budget_total || ''), package_name: project.package_name || '',
+      assigned_admin: project.assigned_admin || '',
+    })
+  }
+
+  async function handleUpdateProject(e) {
+    e.preventDefault()
+    if (!editForm.bride_name.trim() || !editForm.groom_name.trim()) return setEditErr('Nama pasangan wajib diisi.')
+    setEditBusy(true); setEditErr('')
+    try {
+      await invokeAccess({
+        action: 'update_project', project_id: editingProject.id,
+        ...editForm,
+        budget_total: parseInt(String(editForm.budget_total).replace(/\D/g, '')) || 0,
+      })
+      setEditingProject(null); setEditForm(null)
+      await fetchProjects()
+    } catch (err) {
+      setEditErr('Gagal menyimpan perubahan: ' + err.message)
+    } finally { setEditBusy(false) }
   }
 
   function generateSlug(bride, groom) {
@@ -439,6 +472,9 @@ export default function AdminDashboard() {
                           cursor: 'pointer', textDecoration: 'none', flexShrink: 0,
                         }}>Buka ↗</a>
                         {isSupeadmin && (
+                          <button onClick={() => startEditProject(p)} style={{ fontSize:11, fontWeight:600, padding:'4px 10px', background:WHITE, color:G700, border:`1px solid ${G100}`, borderRadius:6, cursor:'pointer', flexShrink:0 }}>Edit</button>
+                        )}
+                        {isSupeadmin && (
                           <button onClick={() => handleDeleteProject(p)}
                             disabled={deleteBusy === p.id}
                             style={{ fontSize:11, fontWeight:600, padding:'4px 10px',
@@ -514,6 +550,30 @@ export default function AdminDashboard() {
                     </div>
                   )
                 })}
+              </div>
+            )}
+
+            {isSupeadmin && editingProject && editForm && (
+              <div style={{ position:'fixed', inset:0, zIndex:100, background:'rgba(0,0,0,.45)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={() => !editBusy && setEditingProject(null)}>
+                <div style={{ width:'100%', maxWidth:620, maxHeight:'90dvh', overflowY:'auto', background:WHITE, borderRadius:16, padding:22 }} onClick={e => e.stopPropagation()}>
+                  <p style={{ fontFamily:'Lora, serif', fontSize:19, fontWeight:600, margin:'0 0 4px' }}>Edit project</p>
+                  <p style={{ fontSize:11, color:MUTED, margin:'0 0 18px' }}>URL /{editingProject.slug} tetap dipertahankan agar link client tidak berubah.</p>
+                  <form onSubmit={handleUpdateProject}>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                      {[['bride_name','Nama pengantin wanita'],['groom_name','Nama pengantin pria'],['wedding_date','Tanggal pernikahan','date'],['location','Kota'],['venue','Venue'],['guest_count','Estimasi tamu'],['budget_total','Total anggaran'],['package_name','Nama paket']].map(([key,label,type]) => (
+                        <div key={key}><p style={{ fontSize:12,color:MUTED,margin:'0 0 5px' }}>{label}</p><input type={type||'text'} value={editForm[key]} onChange={e => setEditForm(s => ({...s,[key]:e.target.value}))} style={inp()} /></div>
+                      ))}
+                    </div>
+                    <div style={{ marginTop:12 }}><p style={{ fontSize:12,color:MUTED,margin:'0 0 5px' }}>Project Manager</p>
+                      <select value={editForm.assigned_admin} onChange={e => setEditForm(s => ({...s,assigned_admin:e.target.value}))} style={inp({appearance:'none'})}>
+                        <option value="">— Belum ditugaskan —</option>
+                        {admins.filter(a => a.role === 'admin' || a.role === 'superadmin').map(a => <option key={a.id} value={a.id}>{a.full_name} ({a.role})</option>)}
+                      </select>
+                    </div>
+                    {editErr && <p style={{fontSize:12,color:RED,margin:'10px 0 0'}}>{editErr}</p>}
+                    <div style={{display:'flex',gap:8,marginTop:16}}><button disabled={editBusy} style={{flex:1,padding:10,border:0,borderRadius:9,background:editBusy?MUTED:G900,color:WHITE,fontWeight:600}}>{editBusy?'Menyimpan…':'Simpan perubahan'}</button><button type="button" onClick={() => setEditingProject(null)} disabled={editBusy} style={{padding:'10px 16px',border:`1px solid ${BORDER}`,borderRadius:9,background:WHITE,color:MUTED}}>Batal</button></div>
+                  </form>
+                </div>
               </div>
             )}
           </div>
