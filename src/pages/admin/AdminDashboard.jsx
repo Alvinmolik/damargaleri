@@ -6,6 +6,7 @@ const AdminProject360 = lazy(() => import('./AdminProject360'))
 const LeadDetail = lazy(() => import('./LeadDetail'))
 const AdminCalendar = lazy(() => import('./AdminCalendar'))
 const LeadFormSettings = lazy(() => import('./LeadFormSettings'))
+const ConvertLeadDialog = lazy(() => import('./ConvertLeadDialog'))
 
 const G900='#1B4332',G700='#2D6A4F',G500='#52B788',G100='#D8F3DC',G50='#F0FAF3'
 const DARK='#1C1C1E',MID='#3D3D3A',MUTED='#8A8A8E',BORDER='#E2EDE6',WHITE='#FFFFFF',RED='#C0392B'
@@ -48,7 +49,7 @@ export default function AdminDashboard() {
   const [leadsLoading, setLeadsLoading] = useState(false)
   const [view, setView]         = useState('overview')
   const [form, setForm]         = useState({
-    bride_name: '', groom_name: '', wedding_date: '',
+    bride_name: '', groom_name: '', wedding_date: '', estimated_wedding_month:'',
     venue: '', location: 'Surabaya', guest_count: '',
     budget_total: '', package_name: 'Full Service Premium',
     assigned_admin: '', client_name: '', client_email: '',
@@ -74,12 +75,14 @@ export default function AdminDashboard() {
   const [savingPm, setSavingPm] = useState(false)
   const [leadForm, setLeadForm] = useState({
     contact_name:'', bride_name:'', groom_name:'', phone:'', email:'',
-    event_date:'', location:'Surabaya', source:'manual', source_detail:'',
+    event_date:'', estimated_event_month:'', location:'Surabaya', source:'manual', source_detail:'',
     interested_package:'', estimated_budget:'', owner_admin:'', notes:'',
   })
   const [leadErr, setLeadErr] = useState('')
   const [savingLead, setSavingLead] = useState(false)
   const [convertBusy, setConvertBusy] = useState(null)
+  const [convertingLead, setConvertingLead] = useState(null)
+  const [convertError, setConvertError] = useState('')
   const [selectedLead, setSelectedLead] = useState(null)
 
   useEffect(() => {
@@ -159,6 +162,7 @@ export default function AdminDashboard() {
       phone: leadForm.phone.trim() || null,
       email: leadForm.email.trim().toLowerCase() || null,
       event_date: leadForm.event_date || null,
+      estimated_event_month: leadForm.estimated_event_month || null,
       location: leadForm.location.trim() || null,
       source: leadForm.source,
       source_detail: leadForm.source_detail.trim() || null,
@@ -171,7 +175,7 @@ export default function AdminDashboard() {
       setLeadErr('Gagal menyimpan calon client: ' + error.message)
     } else {
       setLeadForm({ contact_name:'',bride_name:'',groom_name:'',phone:'',email:'',
-        event_date:'',location:'Surabaya',source:'manual',source_detail:'',
+        event_date:'',estimated_event_month:'',location:'Surabaya',source:'manual',source_detail:'',
         interested_package:'',estimated_budget:'',owner_admin:'',notes:'' })
       await fetchLeads()
     }
@@ -197,22 +201,17 @@ export default function AdminDashboard() {
     }
   }
 
-  async function handleConvertLead(lead) {
-    if (!lead.bride_name?.trim() || !lead.groom_name?.trim()) {
-      window.alert('Lengkapi nama kedua calon pengantin sebelum membuat project.')
-      return
-    }
-    const confirmed = window.confirm(
-      `Jadikan ${lead.bride_name} & ${lead.groom_name} sebagai project aktif?\n\nChecklist standar dan kategori budget akan dibuat otomatis.`
-    )
-    if (!confirmed) return
-    setConvertBusy(lead.id)
+  async function handleConvertLead(project) {
+    const lead = convertingLead
+    if (!lead) return
+    setConvertBusy(lead.id); setConvertError('')
     try {
-      await invokeAccess({ action:'convert_lead', lead_id:lead.id })
+      await invokeAccess({ action:'convert_lead', lead_id:lead.id, project })
       await Promise.all([fetchLeads(), fetchProjects()])
+      setConvertingLead(null)
       setView('projects')
     } catch (err) {
-      window.alert('Gagal membuat project: ' + err.message)
+      setConvertError('Gagal membuat project: ' + err.message)
     } finally {
       setConvertBusy(null)
     }
@@ -311,7 +310,7 @@ export default function AdminDashboard() {
     setEditErr('')
     setEditForm({
       bride_name: project.bride_name || '', groom_name: project.groom_name || '',
-      wedding_date: project.wedding_date || '', venue: project.venue || '',
+      wedding_date: project.wedding_date || '', estimated_wedding_month:project.estimated_wedding_month || '', venue: project.venue || '',
       location: project.location || '', guest_count: project.guest_count || '',
       budget_total: String(project.budget_total || ''), package_name: project.package_name || '',
       assigned_admin: project.assigned_admin || '',
@@ -401,6 +400,7 @@ export default function AdminDashboard() {
         bride_name: form.bride_name.trim(),
         groom_name: form.groom_name.trim(),
         wedding_date: form.wedding_date || null,
+        estimated_wedding_month:form.wedding_date ? null : form.estimated_wedding_month || null,
         venue: form.venue || null,
         location: form.location,
         guest_count: form.guest_count || null,
@@ -446,7 +446,7 @@ export default function AdminDashboard() {
     setSaving(false)
     setView('projects')
     fetchProjects()
-    setForm({ bride_name:'',groom_name:'',wedding_date:'',venue:'',location:'Surabaya',
+    setForm({ bride_name:'',groom_name:'',wedding_date:'',estimated_wedding_month:'',venue:'',location:'Surabaya',
       guest_count:'',budget_total:'',package_name:'Full Service Premium',assigned_admin:'',
       client_name:'',client_email:'' })
   }
@@ -682,8 +682,8 @@ export default function AdminDashboard() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 20 }}>
               {[
                 { label: 'Total project', val: projects.length },
-                { label: 'Aktif', val: projects.filter(p => new Date(p.wedding_date) > new Date()).length },
-                { label: 'Selesai', val: projects.filter(p => new Date(p.wedding_date) <= new Date()).length },
+                { label: 'Aktif', val: projects.filter(p => p.project_status === 'active').length },
+                { label: 'Selesai', val: projects.filter(p => p.project_status === 'done').length },
               ].map((s, i) => (
                 <div key={i} style={{ background: WHITE, borderRadius: 12,
                   border: `1px solid ${BORDER}`, padding: '16px 18px' }}>
@@ -718,7 +718,7 @@ export default function AdminDashboard() {
                 {projects.map(p => {
                   const weddingDate = p.wedding_date ? new Date(p.wedding_date) : null
                   const isUpcoming = weddingDate && weddingDate > new Date()
-                  const status = !weddingDate ? 'active' : isUpcoming ? 'upcoming' : 'done'
+                  const status = p.project_status === 'done' ? 'done' : isUpcoming ? 'upcoming' : 'active'
                   const clientUrl = `${window.location.origin}/${p.slug}`
                   const invitations = p.project_invitations || []
                   const draft = inviteDrafts[p.id] || { name:'', email:'' }
@@ -741,7 +741,7 @@ export default function AdminDashboard() {
                           <p style={{ fontSize: 12, color: MUTED, margin: 0 }}>
                             {weddingDate
                               ? weddingDate.toLocaleDateString('id-ID', { day:'numeric',month:'long',year:'numeric' })
-                              : 'Tanggal belum diset'
+                              : p.estimated_wedding_month ? `Perkiraan ${new Date(`${p.estimated_wedding_month}-01T12:00:00`).toLocaleDateString('id-ID',{month:'long',year:'numeric'})}` : 'Tanggal belum diset'
                             }
                             {p.location ? ` · ${p.location}` : ''}
                           </p>
@@ -872,6 +872,8 @@ export default function AdminDashboard() {
                         <div key={key}><p style={{ fontSize:12,color:MUTED,margin:'0 0 5px' }}>{label}</p><input type={type||'text'} value={editForm[key]} onChange={e => setEditForm(s => ({...s,[key]:e.target.value}))} style={inp()} /></div>
                       ))}
                     </div>
+                    {!editForm.wedding_date && <div style={{marginTop:10}}><p style={{fontSize:12,color:MUTED,margin:'0 0 5px'}}>Atau perkiraan bulan dan tahun</p>
+                      <input type="month" value={editForm.estimated_wedding_month} onChange={e=>setEditForm(s=>({...s,estimated_wedding_month:e.target.value}))} style={inp()}/></div>}
                     <div style={{ marginTop:12 }}><p style={{ fontSize:12,color:MUTED,margin:'0 0 5px' }}>Project Manager</p>
                       <select value={editForm.assigned_admin} onChange={e => setEditForm(s => ({...s,assigned_admin:e.target.value}))} style={inp({appearance:'none'})}>
                         <option value="">— Belum ditugaskan —</option>
@@ -900,7 +902,6 @@ export default function AdminDashboard() {
                   ['email','Email','email','nama@email.com'],
                   ['bride_name','Nama pengantin wanita','text','opsional'],
                   ['groom_name','Nama pengantin pria','text','opsional'],
-                  ['event_date','Perkiraan tanggal acara','date',''],
                   ['location','Kota','text','mis. Surabaya'],
                   ['estimated_budget','Perkiraan budget','text','mis. 150000000'],
                   ['interested_package','Paket yang diminati','text','opsional'],
@@ -911,6 +912,10 @@ export default function AdminDashboard() {
                       onChange={e => setLeadForm(s => ({...s,[key]:e.target.value}))} style={inp()} />
                   </div>
                 ))}
+                <div style={{marginBottom:10}}><p style={{fontSize:11,color:MUTED,margin:'0 0 4px'}}>Tanggal pasti (boleh kosong)</p>
+                  <input type="date" value={leadForm.event_date} onChange={e=>setLeadForm(s=>({...s,event_date:e.target.value,estimated_event_month:''}))} style={inp()}/></div>
+                {!leadForm.event_date && <div style={{marginBottom:10}}><p style={{fontSize:11,color:MUTED,margin:'0 0 4px'}}>Atau perkiraan bulan dan tahun</p>
+                  <input type="month" value={leadForm.estimated_event_month} onChange={e=>setLeadForm(s=>({...s,estimated_event_month:e.target.value}))} style={inp()}/></div>}
                 <div style={{ marginBottom:10 }}>
                   <p style={{fontSize:11,color:MUTED,margin:'0 0 4px'}}>Sumber informasi</p>
                   <select value={leadForm.source} onChange={e => setLeadForm(s=>({...s,source:e.target.value}))} style={inp({appearance:'none'})}>
@@ -945,6 +950,7 @@ export default function AdminDashboard() {
                   <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:10}}>
                     <span style={{fontSize:10,padding:'3px 7px',borderRadius:20,background:G50,color:G700}}>{l.source || 'manual'}</span>
                     {l.event_date&&<span style={{fontSize:10,padding:'3px 7px',borderRadius:20,background:'#F5F5F5',color:MID}}>Acara {new Date(l.event_date).toLocaleDateString('id-ID')}</span>}
+                    {!l.event_date&&l.estimated_event_month&&<span style={{fontSize:10,padding:'3px 7px',borderRadius:20,background:'#F5F5F5',color:MID}}>Perkiraan {new Date(`${l.estimated_event_month}-01T12:00:00`).toLocaleDateString('id-ID',{month:'long',year:'numeric'})}</span>}
                     <span style={{fontSize:10,padding:'3px 7px',borderRadius:20,background:'#F5F5F5',color:MID}}>PM: {l.profiles?.full_name||'Belum ditugaskan'}</span>
                     {l.next_follow_up_at && <span style={{fontSize:10,padding:'3px 7px',borderRadius:20,background:new Date(l.next_follow_up_at)<new Date()?'#FFF1EE':AMBERBG,color:new Date(l.next_follow_up_at)<new Date()?RED:AMBER}}>Follow-up: {new Date(l.next_follow_up_at).toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'})}</span>}
                   </div>
@@ -953,7 +959,7 @@ export default function AdminDashboard() {
                     {l.converted_project_id ? (
                       <button onClick={()=>setView('projects')} style={{fontSize:11,padding:'6px 10px',border:`1px solid ${G100}`,borderRadius:7,background:G50,color:G700,fontWeight:600,cursor:'pointer'}}>Lihat project</button>
                     ) : (
-                      <button onClick={()=>handleConvertLead(l)} disabled={convertBusy===l.id}
+                      <button onClick={()=>{setConvertError('');setConvertingLead(l)}} disabled={convertBusy===l.id}
                         style={{fontSize:11,padding:'6px 10px',border:0,borderRadius:7,background:convertBusy===l.id?MUTED:G900,color:WHITE,fontWeight:600,cursor:convertBusy===l.id?'not-allowed':'pointer'}}>
                         {convertBusy===l.id?'Membuat project…':'Jadikan project'}
                       </button>
@@ -971,6 +977,11 @@ export default function AdminDashboard() {
               onChanged={updated => { setSelectedLead(updated); fetchLeads() }}/>
           </Suspense>
         )}
+        {convertingLead && <Suspense fallback={null}>
+          <ConvertLeadDialog lead={convertingLead} admins={admins} isSuperadmin={isSupeadmin}
+            busy={convertBusy===convertingLead.id} error={convertError}
+            onClose={()=>setConvertingLead(null)} onSubmit={handleConvertLead}/>
+        </Suspense>}
 
         {/* ── NEW PROJECT FORM ── */}
         {view === 'new' && (
@@ -1048,6 +1059,8 @@ export default function AdminDashboard() {
                     style={inp()}/>
                 </div>
               </div>
+              {!form.wedding_date && <div style={{marginBottom:10}}><p style={{fontSize:12,color:MUTED,margin:'0 0 5px'}}>Atau perkiraan bulan dan tahun</p>
+                <input type="month" value={form.estimated_wedding_month} onChange={e=>setForm(p=>({...p,estimated_wedding_month:e.target.value}))} style={inp()}/></div>}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
                 <div>
                   <p style={{ fontSize: 12, color: MUTED, margin: '0 0 5px' }}>Venue</p>
