@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
+
+const AdminProject360 = lazy(() => import('./AdminProject360'))
 
 const G900='#1B4332',G700='#2D6A4F',G500='#52B788',G100='#D8F3DC',G50='#F0FAF3'
 const DARK='#1C1C1E',MID='#3D3D3A',MUTED='#8A8A8E',BORDER='#E2EDE6',WHITE='#FFFFFF',RED='#C0392B'
@@ -57,6 +59,7 @@ export default function AdminDashboard() {
   const [deleteBusy, setDeleteBusy] = useState(null)
   const [templateBusy, setTemplateBusy] = useState(null)
   const [editingProject, setEditingProject] = useState(null)
+  const [selectedProject, setSelectedProject] = useState(null)
   const [editForm, setEditForm] = useState(null)
   const [editBusy, setEditBusy] = useState(false)
   const [editErr, setEditErr] = useState('')
@@ -300,6 +303,17 @@ export default function AdminDashboard() {
     })
   }
 
+  function openProject360(project) {
+    setSelectedProject(project)
+    setView('project360')
+    window.scrollTo({ top:0, behavior:'smooth' })
+  }
+
+  function editFromProject360(project) {
+    setView('projects')
+    startEditProject(project)
+  }
+
   async function handleUpdateProject(e) {
     e.preventDefault()
     if (!editForm.bride_name.trim() || !editForm.groom_name.trim()) return setEditErr('Nama pasangan wajib diisi.')
@@ -517,6 +531,16 @@ export default function AdminDashboard() {
           ))}
         </div>
 
+        {view === 'project360' && selectedProject && (
+          <Suspense fallback={<div style={{padding:40,textAlign:'center',color:MUTED}}>Memuat Project 360…</div>}>
+            <AdminProject360
+              project={selectedProject}
+              onBack={() => { setSelectedProject(null); setView('projects') }}
+              onEdit={editFromProject360}
+            />
+          </Suspense>
+        )}
+
         {/* ── OPERATIONAL OVERVIEW ── */}
         {view === 'overview' && (
           <div>
@@ -715,6 +739,11 @@ export default function AdminDashboard() {
                           border: `1px solid ${G100}`, borderRadius: 6,
                           cursor: 'pointer', textDecoration: 'none', flexShrink: 0,
                         }}>Buka ↗</a>
+                        <button onClick={() => openProject360(p)} style={{
+                          fontSize:11, fontWeight:650, padding:'4px 10px',
+                          background:G700, color:WHITE, border:'none', borderRadius:6,
+                          cursor:'pointer', flexShrink:0,
+                        }}>Kelola 360</button>
                         {isSupeadmin && (
                           <button onClick={() => startEditProject(p)} style={{ fontSize:11, fontWeight:600, padding:'4px 10px', background:WHITE, color:G700, border:`1px solid ${G100}`, borderRadius:6, cursor:'pointer', flexShrink:0 }}>Edit</button>
                         )}
