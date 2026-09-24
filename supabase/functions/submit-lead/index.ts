@@ -62,12 +62,25 @@ Deno.serve(async (request: Request) => {
       return reply(origin, { error: 'Isian tidak valid.' }, 400)
     }
     const answers: Record<string, string> = {}
+    const selections: Record<string, string[]> = {}
     for (const field of settings.fields as FormField[]) {
       if (field.enabled === false) continue
       if (!field.key || (!standardKeys.has(field.key) && !/^custom_[a-z0-9_]{1,40}$/.test(field.key))) {
         throw new Error('Invalid form field')
       }
       const value = inputs[field.key]
+      if (field.type === 'checkbox') {
+        if (!field.key.startsWith('custom_') || !Array.isArray(value) && value !== undefined) {
+          return reply(origin, { error: 'Pilihan tidak valid.' }, 400)
+        }
+        const selected = value || []
+        if (!Array.isArray(field.options) || field.options.length > 20 || selected.length > 20 ||
+          selected.some((item: unknown) => typeof item !== 'string' || item.length > 500 || !field.options?.includes(item)) ||
+          new Set(selected).size !== selected.length) return reply(origin, { error: 'Pilihan tidak valid.' }, 400)
+        if (field.required && selected.length === 0) return reply(origin, { error: `Lengkapi kolom ${field.key}.` }, 400)
+        if (selected.length) selections[field.key] = selected
+        continue
+      }
       if (value !== undefined && typeof value !== 'string') return reply(origin, { error: 'Isian tidak valid.' }, 400)
       const cleaned = String(value || '').trim()
       if (field.required && !cleaned) return reply(origin, { error: `Lengkapi kolom ${field.key}.` }, 400)
@@ -99,8 +112,8 @@ Deno.serve(async (request: Request) => {
       ? body.tracking : {}
     const track = (key: string) => String(tracking[key] || '').slice(0, 120).trim() || null
     const extra = Object.fromEntries((settings.fields as FormField[])
-      .filter(field => field.key.startsWith('custom_') && answers[field.key])
-      .map(field => [field.key, { label:String((field as FormField & { label?: string }).label || field.key).slice(0, 100), value:answers[field.key] }]))
+      .filter(field => field.key.startsWith('custom_') && (answers[field.key] || selections[field.key]))
+      .map(field => [field.key, { label:String((field as FormField & { label?: string }).label || field.key).slice(0, 100), value:selections[field.key] || answers[field.key] }]))
     const { error: insertError } = await admin.from('leads').insert({
       contact_name:answers.contact_name, phone:answers.phone || null,
       email:answers.email?.toLowerCase() || null, bride_name:answers.bride_name || null,
