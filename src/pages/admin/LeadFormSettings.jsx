@@ -5,7 +5,14 @@ const builtin = new Set([
   'contact_name','phone','email','bride_name','groom_name','event_date',
   'location','estimated_budget','interested_package','source_detail',
 ])
-const types = ['text', 'textarea', 'select']
+const types = [
+  { value:'text', label:'Jawaban singkat' },
+  { value:'textarea', label:'Jawaban panjang' },
+  { value:'select', label:'Dropdown (pilih satu)' },
+  { value:'checkbox', label:'Checklist (pilih beberapa)' },
+]
+const choiceTypes = new Set(['select', 'checkbox'])
+const configurableBuiltin = new Set(['interested_package', 'source_detail'])
 
 export default function LeadFormSettings() {
   const [form, setForm] = useState(null)
@@ -18,7 +25,7 @@ export default function LeadFormSettings() {
       .then(({data,error}) => {
         if (!active) return
         if (error) setMessage(`Pengaturan belum tersedia: ${error.message}`)
-        else setForm({ ...data, fields:data.fields.map(field => ({...field, enabled:true})) })
+        else setForm({ ...data, fields:data.fields.map(field => ({...field, enabled:field.enabled !== false})) })
       })
     return () => { active = false }
   }, [])
@@ -37,7 +44,8 @@ export default function LeadFormSettings() {
 
   async function save() {
     const fields = form.fields.map(field => ({
-      ...field, label:field.label.trim(), options:field.type === 'select' ? field.options : undefined,
+      ...field, label:field.label.trim(), options:choiceTypes.has(field.type)
+        ? (field.options || []).map(option => option.trim()).filter(Boolean) : undefined,
     }))
     const active = fields.filter(field => field.enabled !== false)
     if (!active.some(field => field.key === 'contact_name') || !active.some(field => ['phone','email'].includes(field.key))) {
@@ -46,7 +54,8 @@ export default function LeadFormSettings() {
     if (!active.find(field => field.key === 'contact_name')?.required) {
       return setMessage('Nama kontak wajib diisi agar calon client bisa dicatat.')
     }
-    if (active.some(field => !field.label || (field.type === 'select' && (!field.options?.length || field.options.some(option => !option.trim()))))) {
+    if (active.some(field => !field.label || (choiceTypes.has(field.type) &&
+      (!field.options?.length || field.options.length > 20 || new Set(field.options).size !== field.options.length)))) {
       return setMessage('Lengkapi label dan pilihan jawaban setiap pertanyaan yang aktif.')
     }
     setSaving(true); setMessage('')
@@ -75,8 +84,8 @@ export default function LeadFormSettings() {
       {form.fields.map((field, index) => <div className="lead-form-field" key={field.key}>
         <label className="lead-field-enabled"><input type="checkbox" checked={field.enabled !== false} onChange={e => update(index,{enabled:e.target.checked})}/> Tampilkan</label>
         <label>Label <input value={field.label} maxLength="100" onChange={e => update(index,{label:e.target.value})}/></label>
-        {!builtin.has(field.key) && <label>Jenis <select value={field.type} onChange={e => update(index,{type:e.target.value})}>{types.map(type => <option key={type} value={type}>{type}</option>)}</select></label>}
-        {field.type === 'select' && <label>Pilihan (satu per baris) <textarea value={(field.options || []).join('\n')} onChange={e => update(index,{options:e.target.value.split('\n').map(value => value.trim())})}/></label>}
+        {(!builtin.has(field.key) || configurableBuiltin.has(field.key)) && <label>Jenis pertanyaan <select value={field.type} onChange={e => update(index,{type:e.target.value})}>{types.filter(type => !builtin.has(field.key) || ['text','select'].includes(type.value)).map(type => <option key={type.value} value={type.value}>{type.label}</option>)}</select></label>}
+        {choiceTypes.has(field.type) && <label>Pilihan jawaban (satu per baris, maksimal 20) <textarea value={(field.options || []).join('\n')} onChange={e => update(index,{options:e.target.value.split('\n')})}/></label>}
         <label className="lead-field-enabled"><input type="checkbox" checked={!!field.required} disabled={field.key === 'contact_name'} onChange={e => update(index,{required:e.target.checked})}/> Wajib diisi</label>
         <div className="lead-form-field-actions"><button type="button" onClick={() => move(index,-1)} disabled={index===0}>↑</button><button type="button" onClick={() => move(index,1)} disabled={index===form.fields.length-1}>↓</button>
           {!builtin.has(field.key) && <button type="button" onClick={() => setForm({...form,fields:form.fields.filter((_, position) => position !== index)})}>Hapus</button>}
