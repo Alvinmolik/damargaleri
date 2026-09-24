@@ -543,5 +543,39 @@ body { overscroll-behavior: none; }
 .calendar-form-grid .calendar-notes { grid-column:1/-1; }
 .calendar-form-actions { display:flex; gap:10px; margin-top:18px; }
 .calendar-error { background:#fff1ef; color:#a93f2e; padding:12px; border-radius:8px; font-size:13px; }
+body.public-lead-shell #root { max-width:none; }
+.public-lead-page { min-height:100dvh; background:#1b4332; display:flex; align-items:center; justify-content:center; padding:32px 16px; }
+.public-lead-card { width:min(100%,620px); background:#fff; border-radius:22px; padding:clamp(24px,5vw,46px); color:#1d3329; box-shadow:0 20px 55px #10291b44; }
+.public-lead-brand { font-family:'Dancing Script',cursive; font-size:32px; color:#1b4332; text-decoration:none; display:inline-flex; align-items:baseline; gap:8px; margin-bottom:28px; }
+.public-lead-brand small { font:600 10px Inter,sans-serif; letter-spacing:.13em; text-transform:uppercase; }
+.public-lead-card h1 { font-family:Lora,serif; font-size:clamp(25px,5vw,34px); line-height:1.2; margin:0 0 12px; }
+.public-lead-description { color:#66756b; line-height:1.6; font-size:14px; margin-bottom:24px; }
+.public-lead-card form { display:grid; gap:15px; }
+.public-lead-card form>label { display:grid; gap:6px; color:#315743; font-size:13px; font-weight:600; }
+.public-lead-card input,.public-lead-card select,.public-lead-card textarea { width:100%; padding:11px 13px; border-radius:9px; border:1px solid #d7e7dc; background:white; font:inherit; color:#1c1c1e; }
+.public-lead-card form>button { border:0; border-radius:9px; padding:14px; background:#1b4332; color:white; font-weight:700; font-size:14px; cursor:pointer; }
+.public-lead-card form>button:disabled { opacity:.55; cursor:not-allowed; }
+.public-lead-card form>small { color:#75857b; font-size:11px; line-height:1.5; }
+.public-lead-error { padding:10px 12px; border-radius:8px; color:#a64032; background:#fff0ed; font-size:13px; }
+.public-lead-honeypot { position:absolute; left:-10000px; width:1px; height:1px; overflow:hidden; }
+.public-lead-success { padding:24px 0; line-height:1.7; }
+.lead-form-settings { background:#fff; border:1px solid #e2ede6; padding:24px; border-radius:16px; max-width:900px; }
+.lead-form-settings-heading { display:flex; justify-content:space-between; align-items:center; gap:15px; margin-bottom:22px; }
+.lead-form-settings h2 { margin:0 0 5px; font:italic 24px Lora,serif; }
+.lead-form-settings h3 { margin:18px 0 4px; }
+.lead-form-settings p { color:#63766a; font-size:12px; }
+.lead-form-settings a { color:#2d6a4f; }
+.lead-form-settings label { display:grid; gap:5px; color:#355947; font-size:12px; font-weight:600; margin:12px 0; }
+.lead-form-settings input:not([type=checkbox]),.lead-form-settings textarea,.lead-form-settings select { padding:9px; border:1px solid #d7e7dc; border-radius:8px; width:100%; color:#26382e; background:#fff; font:inherit; }
+.lead-form-settings button { padding:9px 13px; border:1px solid #cfe4d5; border-radius:8px; background:#f0faf3; color:#1b4332; cursor:pointer; font-weight:600; }
+.lead-form-settings-heading button { background:#1b4332; color:white; }
+.lead-form-settings button:disabled { opacity:.5; cursor:not-allowed; }
+.lead-form-settings-message { padding:10px; background:#f0faf3; border-radius:8px; margin:8px 0; }
+.lead-form-settings-hint { margin:6px 0 18px; }
+.lead-form-field { padding:12px 16px; margin:9px 0; background:#fbfdfb; border:1px solid #e2ede6; border-radius:10px; display:grid; grid-template-columns:140px minmax(0,1fr) 110px; align-items:center; gap:10px; }
+.lead-form-field label { margin:0; }
+.lead-form-field .lead-field-enabled { display:flex; align-items:center; gap:6px; }
+.lead-form-field-actions { display:flex; gap:5px; }
+@media(max-width:650px) { .lead-form-settings-heading { align-items:start; flex-direction:column; } .lead-form-field { grid-template-columns:1fr; } }
 @media(max-width:1000px) { .calendar-workspace { grid-template-columns:1fr; } }
 @media(max-width:650px) { .calendar-header { align-items:start; flex-direction:column; } .calendar-form-grid { grid-template-columns:1fr; } .calendar-month,.calendar-detail { padding:12px; } .calendar-day { min-height:58px; padding:4px; } .calendar-day small { font-size:9px; } .calendar-month-nav h2 { font-size:16px; } }

@@ -3,6 +3,7 @@ import { useAuth } from './hooks/useAuth.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import AdminDashboard from './pages/admin/AdminDashboard.jsx'
 import SetPasswordPage from './pages/admin/SetPasswordPage.jsx'
+import PublicLeadForm from './pages/PublicLeadForm.jsx'
 import App from './App.jsx'
 
 export default function Router() {
@@ -16,6 +17,8 @@ export default function Router() {
   }, [])
 
   if (loading) return <LoadingScreen />
+
+  if (path === '/daftar' || path === '/daftar/') return <PublicLeadForm />
 
   const isAdminRoute = path === '/admin' || path.startsWith('/admin/')
   const isPasswordSetup = path === '/admin/setup-password'

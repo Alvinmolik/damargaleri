@@ -15,6 +15,16 @@ export default function LeadDetail({ lead, onClose, onChanged }) {
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [fieldLabels, setFieldLabels] = useState({})
+
+  useEffect(() => {
+    let active = true
+    supabase.from('lead_form_settings').select('fields').eq('id', 1).single()
+      .then(({data}) => {
+        if (active && Array.isArray(data?.fields)) setFieldLabels(Object.fromEntries(data.fields.map(field => [field.key,field.label])))
+      })
+    return () => { active = false }
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -74,6 +84,12 @@ export default function LeadDetail({ lead, onClose, onChanged }) {
           <div><span>Paket</span><strong>{lead.interested_package || '—'}</strong></div>
           <div><span>Follow-up berikutnya</span><strong>{displayDate(lead.next_follow_up_at)}</strong></div>
         </div>
+        {Object.keys(lead.form_answers || {}).length > 0 && <div className="lead-detail-facts">
+          {Object.entries(lead.form_answers).map(([key,value]) => <div key={key}>
+            <span>{(typeof value === 'object' && value?.label) || fieldLabels[key] || 'Jawaban tambahan'}</span>
+            <strong>{String(typeof value === 'object' && value !== null ? value.value : value)}</strong>
+          </div>)}
+        </div>}
         {lead.notes && <p className="lead-detail-initial">Catatan awal: {lead.notes}</p>}
         <form className="lead-detail-followup" onSubmit={saveFollowUp}>
           <label htmlFor="lead-next-followup">Jadwalkan follow-up (waktu lokal perangkat)</label>

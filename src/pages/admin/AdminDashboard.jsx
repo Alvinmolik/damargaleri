@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth'
 const AdminProject360 = lazy(() => import('./AdminProject360'))
 const LeadDetail = lazy(() => import('./LeadDetail'))
 const AdminCalendar = lazy(() => import('./AdminCalendar'))
+const LeadFormSettings = lazy(() => import('./LeadFormSettings'))
 
 const G900='#1B4332',G700='#2D6A4F',G500='#52B788',G100='#D8F3DC',G50='#F0FAF3'
 const DARK='#1C1C1E',MID='#3D3D3A',MUTED='#8A8A8E',BORDER='#E2EDE6',WHITE='#FFFFFF',RED='#C0392B'
@@ -532,6 +533,7 @@ export default function AdminDashboard() {
             { id: 'overview', label: '⌂ Ringkasan' },
             { id: 'projects', label: '💍 Semua project' },
             { id: 'leads',    label: '◎ Calon client' },
+            ...(isSupeadmin ? [{ id:'lead-form', label:'✎ Form pendaftaran' }] : []),
             { id: 'calendar', label: '▦ Kalender' },
             { id: 'new',      label: '+ Buat project baru' },
             ...(isSupeadmin ? [{ id: 'admins', label: '👥 Kelola admin' }] : []),
@@ -565,6 +567,12 @@ export default function AdminDashboard() {
               onOpenProject={project => { setSelectedProject(project); setView('project360') }}
               onChanged={fetchOverview}
             />
+          </Suspense>
+        )}
+
+        {view === 'lead-form' && isSupeadmin && (
+          <Suspense fallback={<div style={{padding:40,textAlign:'center',color:MUTED}}>Memuat pengaturan formulir…</div>}>
+            <LeadFormSettings />
           </Suspense>
         )}
 
