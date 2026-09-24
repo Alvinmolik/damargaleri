@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth'
 
 const AdminProject360 = lazy(() => import('./AdminProject360'))
 const LeadDetail = lazy(() => import('./LeadDetail'))
+const AdminCalendar = lazy(() => import('./AdminCalendar'))
 
 const G900='#1B4332',G700='#2D6A4F',G500='#52B788',G100='#D8F3DC',G50='#F0FAF3'
 const DARK='#1C1C1E',MID='#3D3D3A',MUTED='#8A8A8E',BORDER='#E2EDE6',WHITE='#FFFFFF',RED='#C0392B'
@@ -531,6 +532,7 @@ export default function AdminDashboard() {
             { id: 'overview', label: '⌂ Ringkasan' },
             { id: 'projects', label: '💍 Semua project' },
             { id: 'leads',    label: '◎ Calon client' },
+            { id: 'calendar', label: '▦ Kalender' },
             { id: 'new',      label: '+ Buat project baru' },
             ...(isSupeadmin ? [{ id: 'admins', label: '👥 Kelola admin' }] : []),
           ].map(t => (
@@ -550,6 +552,18 @@ export default function AdminDashboard() {
               project={selectedProject}
               onBack={() => { setSelectedProject(null); setView('projects') }}
               onEdit={editFromProject360}
+            />
+          </Suspense>
+        )}
+
+        {view === 'calendar' && (
+          <Suspense fallback={<div style={{padding:40,textAlign:'center',color:MUTED}}>Memuat kalender…</div>}>
+            <AdminCalendar
+              projects={projects}
+              admins={admins}
+              isSuperadmin={isSupeadmin}
+              onOpenProject={project => { setSelectedProject(project); setView('project360') }}
+              onChanged={fetchOverview}
             />
           </Suspense>
         )}
@@ -592,7 +606,7 @@ export default function AdminDashboard() {
                   <button onClick={() => setView('projects')}>Lihat project</button>
                 </div>
                 {overviewLoading ? <p className="overview-empty">Memuat agenda…</p> : upcomingEvents.length === 0 ? (
-                  <p className="overview-empty">Belum ada agenda mendatang. Event bisa ditambahkan dari Project 360 pada tahap berikutnya.</p>
+                  <p className="overview-empty">Belum ada agenda mendatang. Tambahkan agenda dari Kalender atau Project 360.</p>
                 ) : upcomingEvents.map(event => (
                   <div className="overview-row" key={event.id}>
                     <div className="overview-date-box">
