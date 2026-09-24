@@ -72,9 +72,11 @@ export default function AdminDashboard() {
   const [convertBusy, setConvertBusy] = useState(null)
 
   useEffect(() => {
+    document.body.classList.add('admin-shell')
     fetchProjects()
     fetchLeads()
     if (isSupeadmin) fetchAdmins()
+    return () => document.body.classList.remove('admin-shell')
   }, [])
 
   async function fetchProjects() {
@@ -405,7 +407,7 @@ export default function AdminDashboard() {
   })
 
   return (
-    <div style={{ minHeight: '100dvh', background: '#F5F6F4', fontFamily: 'Inter, sans-serif' }}>
+    <div className="admin-dashboard-root" style={{ minHeight: '100dvh', background: '#F5F6F4', fontFamily: 'Inter, sans-serif' }}>
 
       {/* Top bar */}
       <div style={{
@@ -436,10 +438,10 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: '24px 20px' }}>
+      <div className="admin-dashboard-layout" style={{ maxWidth: 1440, margin: '0 auto', padding: '24px 28px' }}>
 
         {/* Sub nav */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
+        <div className="admin-sidebar" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
           {[
             { id: 'projects', label: '💍 Semua project' },
             { id: 'leads',    label: '◎ Calon client' },
@@ -447,7 +449,7 @@ export default function AdminDashboard() {
             ...(isSupeadmin ? [{ id: 'admins', label: '👥 Kelola admin' }] : []),
           ].map(t => (
             <button key={t.id} onClick={() => setView(t.id)} style={{
-              padding: '8px 16px', fontSize: 13, fontWeight: 500,
+              padding: '10px 14px', fontSize: 13, fontWeight: 500,
               background: view === t.id ? G900 : WHITE,
               color: view === t.id ? WHITE : DARK,
               border: `1px solid ${view === t.id ? G900 : BORDER}`,
