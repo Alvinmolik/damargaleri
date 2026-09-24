@@ -34,7 +34,9 @@ export default function AdminDashboard() {
   const { profile, signOut, isSupeadmin } = useAuth()
   const [projects, setProjects] = useState([])
   const [admins, setAdmins]     = useState([])
+  const [leads, setLeads]       = useState([])
   const [loading, setLoading]   = useState(true)
+  const [leadsLoading, setLeadsLoading] = useState(false)
   const [view, setView]         = useState('projects')
   const [form, setForm]         = useState({
     bride_name: '', groom_name: '', wedding_date: '',
@@ -60,9 +62,17 @@ export default function AdminDashboard() {
   const [pmErr, setPmErr]       = useState('')
   const [pmSuccess, setPmSuccess] = useState('')
   const [savingPm, setSavingPm] = useState(false)
+  const [leadForm, setLeadForm] = useState({
+    contact_name:'', bride_name:'', groom_name:'', phone:'', email:'',
+    event_date:'', location:'Surabaya', source:'manual', source_detail:'',
+    interested_package:'', estimated_budget:'', owner_admin:'', notes:'',
+  })
+  const [leadErr, setLeadErr] = useState('')
+  const [savingLead, setSavingLead] = useState(false)
 
   useEffect(() => {
     fetchProjects()
+    fetchLeads()
     if (isSupeadmin) fetchAdmins()
   }, [])
 
@@ -84,6 +94,57 @@ export default function AdminDashboard() {
       .in('role', ['admin', 'superadmin'])
       .order('full_name')
     setAdmins(data || [])
+  }
+
+  async function fetchLeads() {
+    setLeadsLoading(true)
+    const { data, error } = await supabase
+      .from('leads')
+      .select('*, profiles!owner_admin(full_name)')
+      .order('created_at', { ascending: false })
+    if (!error) setLeads(data || [])
+    setLeadsLoading(false)
+  }
+
+  async function handleCreateLead(e) {
+    e.preventDefault()
+    if (!leadForm.contact_name.trim()) return setLeadErr('Nama kontak wajib diisi.')
+    if (!leadForm.phone.trim() && !leadForm.email.trim()) {
+      return setLeadErr('Isi minimal nomor WhatsApp atau email.')
+    }
+    setSavingLead(true); setLeadErr('')
+    const { error } = await supabase.from('leads').insert({
+      contact_name: leadForm.contact_name.trim(),
+      bride_name: leadForm.bride_name.trim() || null,
+      groom_name: leadForm.groom_name.trim() || null,
+      phone: leadForm.phone.trim() || null,
+      email: leadForm.email.trim().toLowerCase() || null,
+      event_date: leadForm.event_date || null,
+      location: leadForm.location.trim() || null,
+      source: leadForm.source,
+      source_detail: leadForm.source_detail.trim() || null,
+      interested_package: leadForm.interested_package.trim() || null,
+      estimated_budget: parseInt(String(leadForm.estimated_budget).replace(/\D/g,'')) || 0,
+      owner_admin: leadForm.owner_admin || profile?.id,
+      notes: leadForm.notes.trim() || null,
+    })
+    if (error) {
+      setLeadErr('Gagal menyimpan calon client: ' + error.message)
+    } else {
+      setLeadForm({ contact_name:'',bride_name:'',groom_name:'',phone:'',email:'',
+        event_date:'',location:'Surabaya',source:'manual',source_detail:'',
+        interested_package:'',estimated_budget:'',owner_admin:'',notes:'' })
+      await fetchLeads()
+    }
+    setSavingLead(false)
+  }
+
+  async function updateLeadStatus(lead, status) {
+    const { error } = await supabase.from('leads')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', lead.id)
+    if (error) window.alert('Gagal mengubah status: ' + error.message)
+    else fetchLeads()
   }
 
   async function invokeAccess(body) {
@@ -356,9 +417,10 @@ export default function AdminDashboard() {
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '24px 20px' }}>
 
         {/* Sub nav */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
           {[
             { id: 'projects', label: '💍 Semua project' },
+            { id: 'leads',    label: '◎ Calon client' },
             { id: 'new',      label: '+ Buat project baru' },
             ...(isSupeadmin ? [{ id: 'admins', label: '👥 Kelola admin' }] : []),
           ].map(t => (
@@ -576,6 +638,72 @@ export default function AdminDashboard() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── LEADS / CALON CLIENT ── */}
+        {view === 'leads' && (
+          <div className="admin-leads-grid" style={{ display:'grid', gridTemplateColumns:'minmax(280px,.85fr) minmax(360px,1.4fr)', gap:16, alignItems:'start' }}>
+            <div style={{ background:WHITE, borderRadius:14, border:`1px solid ${BORDER}`, padding:20 }}>
+              <p style={{ fontFamily:'Lora, serif', fontSize:18, fontWeight:600, margin:'0 0 4px', fontStyle:'italic' }}>Tambah calon client</p>
+              <p style={{ fontSize:11, color:MUTED, lineHeight:1.5, margin:'0 0 16px' }}>Untuk inquiry, prospek, atau customer yang belum resmi booking.</p>
+              <form onSubmit={handleCreateLead}>
+                {[
+                  ['contact_name','Nama kontak *','text','mis. Rania'],
+                  ['phone','Nomor WhatsApp','tel','mis. 628123456789'],
+                  ['email','Email','email','nama@email.com'],
+                  ['bride_name','Nama pengantin wanita','text','opsional'],
+                  ['groom_name','Nama pengantin pria','text','opsional'],
+                  ['event_date','Perkiraan tanggal acara','date',''],
+                  ['location','Kota','text','mis. Surabaya'],
+                  ['estimated_budget','Perkiraan budget','text','mis. 150000000'],
+                  ['interested_package','Paket yang diminati','text','opsional'],
+                ].map(([key,label,type,placeholder]) => (
+                  <div key={key} style={{ marginBottom:10 }}>
+                    <p style={{ fontSize:11,color:MUTED,margin:'0 0 4px' }}>{label}</p>
+                    <input type={type} value={leadForm[key]} placeholder={placeholder}
+                      onChange={e => setLeadForm(s => ({...s,[key]:e.target.value}))} style={inp()} />
+                  </div>
+                ))}
+                <div style={{ marginBottom:10 }}>
+                  <p style={{fontSize:11,color:MUTED,margin:'0 0 4px'}}>Sumber informasi</p>
+                  <select value={leadForm.source} onChange={e => setLeadForm(s=>({...s,source:e.target.value}))} style={inp({appearance:'none'})}>
+                    <option value="manual">Input manual</option><option value="instagram">Instagram</option>
+                    <option value="tiktok">TikTok</option><option value="google">Google</option>
+                    <option value="whatsapp">WhatsApp</option><option value="referral">Referral</option>
+                    <option value="event">Event/pameran</option><option value="other">Lainnya</option>
+                  </select>
+                </div>
+                <div style={{marginBottom:10}}><p style={{fontSize:11,color:MUTED,margin:'0 0 4px'}}>Detail sumber</p><input value={leadForm.source_detail} onChange={e=>setLeadForm(s=>({...s,source_detail:e.target.value}))} placeholder="mis. Referral Ibu Sinta" style={inp()}/></div>
+                {isSupeadmin && <div style={{marginBottom:10}}><p style={{fontSize:11,color:MUTED,margin:'0 0 4px'}}>Ditangani oleh</p><select value={leadForm.owner_admin} onChange={e=>setLeadForm(s=>({...s,owner_admin:e.target.value}))} style={inp({appearance:'none'})}><option value="">Super Admin</option>{admins.map(a=><option key={a.id} value={a.id}>{a.full_name}</option>)}</select></div>}
+                <div style={{marginBottom:12}}><p style={{fontSize:11,color:MUTED,margin:'0 0 4px'}}>Catatan awal</p><textarea value={leadForm.notes} onChange={e=>setLeadForm(s=>({...s,notes:e.target.value}))} rows={3} style={inp({resize:'vertical'})}/></div>
+                {leadErr && <p style={{fontSize:11,color:RED,margin:'0 0 10px'}}>{leadErr}</p>}
+                <button disabled={savingLead} style={{width:'100%',padding:10,border:0,borderRadius:9,background:savingLead?MUTED:G900,color:WHITE,fontWeight:600}}>{savingLead?'Menyimpan…':'Simpan calon client'}</button>
+              </form>
+            </div>
+
+            <div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:12 }}>
+                {[['Total lead',leads.length],['Perlu dihubungi',leads.filter(l=>l.status==='new').length],['Sudah booking',leads.filter(l=>l.status==='booked').length]].map(([label,val])=><div key={label} style={{background:WHITE,border:`1px solid ${BORDER}`,borderRadius:12,padding:'13px 15px'}}><p style={{fontSize:22,fontFamily:'Lora, serif',fontWeight:700,color:G900,margin:0}}>{val}</p><p style={{fontSize:10,color:MUTED,margin:'2px 0 0'}}>{label}</p></div>)}
+              </div>
+              {leadsLoading ? <div style={{textAlign:'center',padding:32,color:MUTED}}>Memuat calon client…</div> :
+              leads.length === 0 ? <div style={{background:WHITE,border:`1px solid ${BORDER}`,borderRadius:14,padding:32,textAlign:'center',color:MUTED,fontSize:12}}>Belum ada calon client.</div> :
+              <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                {leads.map(l => <div key={l.id} style={{background:WHITE,border:`1px solid ${BORDER}`,borderRadius:13,padding:'14px 16px'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',gap:12}}>
+                    <div><p style={{fontSize:14,fontWeight:600,margin:'0 0 3px',color:DARK}}>{l.contact_name}</p><p style={{fontSize:11,color:MUTED,margin:0}}>{[l.bride_name&&l.groom_name?`${l.bride_name} & ${l.groom_name}`:l.bride_name||l.groom_name,l.phone,l.location].filter(Boolean).join(' · ')}</p></div>
+                    <select value={l.status} onChange={e=>updateLeadStatus(l,e.target.value)} style={inp({width:'auto',minWidth:118,padding:'6px 8px',fontSize:11,appearance:'none'})}>
+                      <option value="new">Baru</option><option value="contacted">Dihubungi</option><option value="meeting">Meeting</option><option value="proposal">Penawaran</option><option value="follow_up">Follow-up</option><option value="booked">Booking</option><option value="lost">Batal</option>
+                    </select>
+                  </div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:10}}>
+                    <span style={{fontSize:10,padding:'3px 7px',borderRadius:20,background:G50,color:G700}}>{l.source || 'manual'}</span>
+                    {l.event_date&&<span style={{fontSize:10,padding:'3px 7px',borderRadius:20,background:'#F5F5F5',color:MID}}>Acara {new Date(l.event_date).toLocaleDateString('id-ID')}</span>}
+                    <span style={{fontSize:10,padding:'3px 7px',borderRadius:20,background:'#F5F5F5',color:MID}}>PM: {l.profiles?.full_name||'Belum ditugaskan'}</span>
+                  </div>
+                </div>)}
+              </div>}
+            </div>
           </div>
         )}
 
