@@ -140,6 +140,10 @@ Deno.serve(async (req: Request) => {
       }
 
       const assignedAdmin = String(body.assigned_admin ?? "").trim() || null;
+      const estimatedMonth = String(body.estimated_wedding_month ?? "").trim();
+      if (estimatedMonth && !/^(20[0-9]{2}|21[0-9]{2})-(0[1-9]|1[0-2])$/.test(estimatedMonth)) {
+        return json(origin, { error: "Perkiraan bulan tidak valid" }, 400);
+      }
       if (assignedAdmin) {
         const { data: targetAdmin, error: targetError } = await admin
           .from("profiles")
@@ -155,6 +159,7 @@ Deno.serve(async (req: Request) => {
         bride_name: brideName,
         groom_name: groomName,
         wedding_date: String(body.wedding_date ?? "").trim() || null,
+        estimated_wedding_month: body.wedding_date ? null : estimatedMonth || null,
         venue: String(body.venue ?? "").trim() || null,
         location: String(body.location ?? "").trim() || null,
         guest_count: String(body.guest_count ?? "").trim() || null,
@@ -182,7 +187,7 @@ Deno.serve(async (req: Request) => {
 
       const { data: lead, error: leadError } = await admin
         .from("leads")
-        .select("id, owner_admin, converted_project_id")
+        .select("id, owner_admin, converted_project_id, bride_name, groom_name, event_date, estimated_event_month, venue, location, interested_package, estimated_budget")
         .eq("id", leadId)
         .single();
       if (leadError || !lead) return json(origin, { error: "Calon client tidak ditemukan" }, 404);
@@ -190,9 +195,51 @@ Deno.serve(async (req: Request) => {
       const canManage = callerProfile.role === "superadmin" || lead.owner_admin === callerId;
       if (!canManage) return json(origin, { error: "Anda tidak menangani calon client ini" }, 403);
 
-      const { data: projectId, error: convertError } = await admin.rpc("convert_lead_to_project", {
+      // Existing deployed clients send only lead_id. Keep that request compatible
+      // while the new review dialog reaches Cloudflare production.
+      const input = body.project ?? lead;
+      if (!input || typeof input !== "object" || Array.isArray(input)) {
+        return json(origin, { error: "Lengkapi data project terlebih dahulu" }, 400);
+      }
+      const read = (key: string) => typeof input[key] === "string" ? input[key].trim() : "";
+      const brideName = read("bride_name");
+      const groomName = read("groom_name");
+      const eventDate = read("event_date");
+      const eventMonth = read("estimated_event_month");
+      const budget = Number(input.estimated_budget ?? 0);
+      if (!brideName || !groomName || brideName.length > 100 || groomName.length > 100 ||
+          ["venue", "location", "interested_package"].some(key => read(key).length > 200)) {
+        return json(origin, { error: "Lengkapi nama pasangan dan periksa panjang isian" }, 400);
+      }
+      if (eventDate && (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate) ||
+          Number.isNaN(Date.parse(`${eventDate}T00:00:00Z`)) ||
+          new Date(`${eventDate}T00:00:00Z`).toISOString().slice(0, 10) !== eventDate)) {
+        return json(origin, { error: "Tanggal acara tidak valid" }, 400);
+      }
+      if (eventMonth && !/^(20[0-9]{2}|21[0-9]{2})-(0[1-9]|1[0-2])$/.test(eventMonth)) {
+        return json(origin, { error: "Bulan acara tidak valid" }, 400);
+      }
+      if (eventDate && eventMonth) return json(origin, { error: "Pilih tanggal atau perkiraan bulan" }, 400);
+      if (!Number.isSafeInteger(budget) || budget < 0) return json(origin, { error: "Budget tidak valid" }, 400);
+
+      let assignedAdmin = body.project ? callerId : (lead.owner_admin || callerId);
+      if (callerProfile.role === "superadmin" && read("assigned_admin")) {
+        const { data: pm } = await admin.from("profiles").select("id, role")
+          .eq("id", read("assigned_admin")).in("role", ["admin", "superadmin"]).maybeSingle();
+        if (!pm) return json(origin, { error: "Project Manager tidak valid" }, 400);
+        assignedAdmin = pm.id;
+      }
+
+      const { data: projectId, error: convertError } = await admin.rpc("convert_lead_to_project_with_details", {
         p_lead_id: lead.id,
         p_actor_id: callerId,
+        p_details: {
+          bride_name: brideName, groom_name: groomName,
+          event_date: eventDate, estimated_event_month: eventMonth,
+          venue: read("venue"), location: read("location"),
+          interested_package: read("interested_package"), estimated_budget: budget,
+          assigned_admin: assignedAdmin,
+        },
       });
       if (convertError) return json(origin, { error: convertError.message }, 400);
 
