@@ -35,9 +35,13 @@ export default function AdminDashboard() {
   const [projects, setProjects] = useState([])
   const [admins, setAdmins]     = useState([])
   const [leads, setLeads]       = useState([])
+  const [overviewTasks, setOverviewTasks] = useState([])
+  const [overviewEvents, setOverviewEvents] = useState([])
+  const [overviewLoading, setOverviewLoading] = useState(true)
+  const [overviewError, setOverviewError] = useState('')
   const [loading, setLoading]   = useState(true)
   const [leadsLoading, setLeadsLoading] = useState(false)
-  const [view, setView]         = useState('projects')
+  const [view, setView]         = useState('overview')
   const [form, setForm]         = useState({
     bride_name: '', groom_name: '', wedding_date: '',
     venue: '', location: 'Surabaya', guest_count: '',
@@ -75,6 +79,7 @@ export default function AdminDashboard() {
     document.body.classList.add('admin-shell')
     fetchProjects()
     fetchLeads()
+    fetchOverview()
     if (isSupeadmin) fetchAdmins()
     return () => document.body.classList.remove('admin-shell')
   }, [])
@@ -107,6 +112,30 @@ export default function AdminDashboard() {
       .order('created_at', { ascending: false })
     if (!error) setLeads(data || [])
     setLeadsLoading(false)
+  }
+
+  async function fetchOverview() {
+    setOverviewLoading(true)
+    setOverviewError('')
+    const [tasksResult, eventsResult] = await Promise.all([
+      supabase
+        .from('checklist_tasks')
+        .select('id, project_id, text, done, due_date, status, projects!inner(id, slug, bride_name, groom_name, assigned_admin, project_status)')
+        .order('due_date', { ascending: true, nullsFirst: false }),
+      supabase
+        .from('project_events')
+        .select('id, project_id, title, event_type, starts_at, ends_at, location, status, projects!inner(id, slug, bride_name, groom_name, assigned_admin, project_status)')
+        .eq('status', 'scheduled')
+        .order('starts_at', { ascending: true }),
+    ])
+
+    if (tasksResult.error || eventsResult.error) {
+      setOverviewError(tasksResult.error?.message || eventsResult.error?.message || 'Data ringkasan gagal dimuat.')
+    } else {
+      setOverviewTasks(tasksResult.data || [])
+      setOverviewEvents(eventsResult.data || [])
+    }
+    setOverviewLoading(false)
   }
 
   async function handleCreateLead(e) {
@@ -406,6 +435,35 @@ export default function AdminDashboard() {
     color: DARK, fontFamily: 'Inter, sans-serif', boxSizing: 'border-box', ...extra
   })
 
+  const today = new Date()
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const sevenDaysAhead = new Date(startOfToday)
+  sevenDaysAhead.setDate(sevenDaysAhead.getDate() + 7)
+  const activeProjects = projects.filter(p => p.project_status === 'active')
+  const openTasks = overviewTasks.filter(t => !t.done)
+  const overdueTasks = openTasks.filter(t => t.due_date && new Date(`${t.due_date}T00:00:00`) < startOfToday)
+  const urgentTasks = openTasks
+    .filter(t => t.due_date && new Date(`${t.due_date}T00:00:00`) <= sevenDaysAhead)
+    .slice(0, 6)
+  const completedTasks = overviewTasks.filter(t => t.done).length
+  const checklistProgress = overviewTasks.length
+    ? Math.round((completedTasks / overviewTasks.length) * 100)
+    : 0
+  const upcomingEvents = overviewEvents
+    .filter(e => new Date(e.starts_at) >= startOfToday)
+    .slice(0, 6)
+  const formatDate = (value, withTime=false) => value
+    ? new Date(value).toLocaleDateString('id-ID', {
+        day:'numeric', month:'short', year:'numeric',
+        ...(withTime ? { hour:'2-digit', minute:'2-digit' } : {}),
+      })
+    : 'Belum dijadwalkan'
+  const eventLabels = {
+    wedding:'Pernikahan', prewedding:'Prewedding', akad:'Akad', reception:'Resepsi',
+    engagement:'Lamaran', meeting:'Meeting', fitting:'Fitting', food_tasting:'Food tasting',
+    technical_meeting:'Technical meeting', other:'Lainnya',
+  }
+
   return (
     <div className="admin-dashboard-root" style={{ minHeight: '100dvh', background: '#F5F6F4', fontFamily: 'Inter, sans-serif' }}>
 
@@ -443,6 +501,7 @@ export default function AdminDashboard() {
         {/* Sub nav */}
         <div className="admin-sidebar" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
           {[
+            { id: 'overview', label: '⌂ Ringkasan' },
             { id: 'projects', label: '💍 Semua project' },
             { id: 'leads',    label: '◎ Calon client' },
             { id: 'new',      label: '+ Buat project baru' },
@@ -457,6 +516,105 @@ export default function AdminDashboard() {
             }}>{t.label}</button>
           ))}
         </div>
+
+        {/* ── OPERATIONAL OVERVIEW ── */}
+        {view === 'overview' && (
+          <div>
+            <div className="overview-heading">
+              <div>
+                <p className="overview-eyebrow">DASHBOARD OPERASIONAL</p>
+                <h1>Selamat datang, {profile?.full_name || 'Admin'}</h1>
+                <p>Pantau hal yang perlu ditangani hari ini tanpa membuka project satu per satu.</p>
+              </div>
+              <button onClick={() => Promise.all([fetchProjects(), fetchLeads(), fetchOverview()])}>
+                ↻ Perbarui data
+              </button>
+            </div>
+
+            {overviewError && <div className="overview-error">Ringkasan belum lengkap: {overviewError}</div>}
+
+            <div className="overview-kpi-grid">
+              {[
+                { label:'Project aktif', value:activeProjects.length, note:`${projects.length} total project`, tone:'green' },
+                { label:'Lead baru', value:leads.filter(l => l.status === 'new').length, note:`${leads.filter(l => !['booked','lost'].includes(l.status)).length} masih diproses`, tone:'blue' },
+                { label:'Tugas terlambat', value:overdueTasks.length, note:overdueTasks.length ? 'Perlu ditindaklanjuti' : 'Tidak ada keterlambatan', tone:overdueTasks.length ? 'red' : 'green' },
+                { label:'Progress checklist', value:`${checklistProgress}%`, note:`${completedTasks} dari ${overviewTasks.length} tugas selesai`, tone:'amber' },
+              ].map(card => (
+                <div className={`overview-kpi overview-kpi--${card.tone}`} key={card.label}>
+                  <span>{card.label}</span>
+                  <strong>{overviewLoading ? '—' : card.value}</strong>
+                  <small>{card.note}</small>
+                </div>
+              ))}
+            </div>
+
+            <div className="overview-main-grid">
+              <section className="overview-panel">
+                <div className="overview-panel-title">
+                  <div><span>JADWAL TERDEKAT</span><h2>Agenda semua project</h2></div>
+                  <button onClick={() => setView('projects')}>Lihat project</button>
+                </div>
+                {overviewLoading ? <p className="overview-empty">Memuat agenda…</p> : upcomingEvents.length === 0 ? (
+                  <p className="overview-empty">Belum ada agenda mendatang. Event bisa ditambahkan dari Project 360 pada tahap berikutnya.</p>
+                ) : upcomingEvents.map(event => (
+                  <div className="overview-row" key={event.id}>
+                    <div className="overview-date-box">
+                      <strong>{new Date(event.starts_at).toLocaleDateString('id-ID',{day:'2-digit'})}</strong>
+                      <span>{new Date(event.starts_at).toLocaleDateString('id-ID',{month:'short'})}</span>
+                    </div>
+                    <div className="overview-row-copy">
+                      <strong>{event.title}</strong>
+                      <span>{eventLabels[event.event_type] || 'Agenda'} · {event.projects?.bride_name} & {event.projects?.groom_name}</span>
+                      <small>{formatDate(event.starts_at, true)}{event.location ? ` · ${event.location}` : ''}</small>
+                    </div>
+                    <a href={`/${event.projects?.slug}`} target="_blank" rel="noreferrer">Buka ↗</a>
+                  </div>
+                ))}
+              </section>
+
+              <section className="overview-panel">
+                <div className="overview-panel-title">
+                  <div><span>PRIORITAS 7 HARI</span><h2>Checklist mendesak</h2></div>
+                  <strong className={overdueTasks.length ? 'danger-count' : ''}>{overdueTasks.length} terlambat</strong>
+                </div>
+                {overviewLoading ? <p className="overview-empty">Memuat checklist…</p> : urgentTasks.length === 0 ? (
+                  <p className="overview-empty">Tidak ada checklist yang jatuh tempo dalam tujuh hari ke depan.</p>
+                ) : urgentTasks.map(task => {
+                  const overdue = new Date(`${task.due_date}T00:00:00`) < startOfToday
+                  return <div className="overview-task" key={task.id}>
+                    <span className={overdue ? 'task-dot task-dot--late' : 'task-dot'} />
+                    <div>
+                      <strong>{task.text}</strong>
+                      <span>{task.projects?.bride_name} & {task.projects?.groom_name}</span>
+                    </div>
+                    <small className={overdue ? 'late-text' : ''}>{overdue ? 'Terlambat · ' : ''}{formatDate(task.due_date)}</small>
+                  </div>
+                })}
+              </section>
+            </div>
+
+            {isSupeadmin && (
+              <section className="overview-panel overview-workload">
+                <div className="overview-panel-title">
+                  <div><span>BEBAN PROJECT MANAGER</span><h2>Distribusi project aktif</h2></div>
+                  <button onClick={() => setView('admins')}>Kelola PM</button>
+                </div>
+                <div className="workload-grid">
+                  {admins.map(admin => {
+                    const assigned = activeProjects.filter(p => p.assigned_admin === admin.id).length
+                    const maxAssigned = Math.max(1, ...admins.map(a => activeProjects.filter(p => p.assigned_admin === a.id).length))
+                    return <div className="workload-card" key={admin.id}>
+                      <div><strong>{admin.full_name}</strong><span>{admin.role === 'superadmin' ? 'Super Admin' : 'Project Manager'}</span></div>
+                      <b>{assigned} project</b>
+                      <div className="workload-track"><i style={{width:`${Math.max(assigned ? 12 : 0, (assigned/maxAssigned)*100)}%`}} /></div>
+                    </div>
+                  })}
+                  {admins.length === 0 && <p className="overview-empty">Belum ada Project Manager aktif.</p>}
+                </div>
+              </section>
+            )}
+          </div>
+        )}
 
         {/* ── PROJECT LIST ── */}
         {view === 'projects' && (
