@@ -606,7 +606,7 @@ export default function AdminDashboard() {
                   <button onClick={() => setView('projects')}>Lihat project</button>
                 </div>
                 {overviewLoading ? <p className="overview-empty">Memuat agenda…</p> : upcomingEvents.length === 0 ? (
-                  <p className="overview-empty">Belum ada agenda mendatang. Event bisa ditambahkan dari Project 360 pada tahap berikutnya.</p>
+                  <p className="overview-empty">Belum ada agenda mendatang. Tambahkan agenda dari Kalender atau Project 360.</p>
                 ) : upcomingEvents.map(event => (
                   <div className="overview-row" key={event.id}>
                     <div className="overview-date-box">
