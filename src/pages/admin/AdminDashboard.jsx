@@ -967,7 +967,7 @@ export default function AdminDashboard() {
 
         {selectedLead && (
           <Suspense fallback={null}>
-            <LeadDetail lead={selectedLead} onClose={() => setSelectedLead(null)}
+            <LeadDetail lead={selectedLead} admins={admins} isSuperadmin={isSupeadmin} onClose={() => setSelectedLead(null)}
               onChanged={updated => { setSelectedLead(updated); fetchLeads() }}/>
           </Suspense>
         )}

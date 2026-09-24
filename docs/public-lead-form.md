@@ -2,6 +2,8 @@
 
 Halaman publik ada di `https://app.damargaleri.com/daftar`. Website utama bisa memberi tombol menuju URL itu dan menambahkan parameter `utm_source`, `utm_medium`, dan `utm_campaign`. Semua pendaftaran menjadi lead baru dengan sumber `website`, tanpa akun client dan tanpa membuat project otomatis. Superadmin dapat mengatur pertanyaan pada menu **Form pendaftaran**.
 
+Lead baru belum ditugaskan kepada PM. Superadmin melihatnya di **Calon client → Detail & follow-up → Ditangani oleh**, kemudian memilih PM yang bertanggung jawab. Setelah itu lead terlihat di akun PM tersebut.
+
 ## Sebelum mengaktifkan halaman
 
 1. Jalankan migrasi `supabase/20260924_public_lead_form.sql` di project Supabase yang digunakan aplikasi. Pastikan tabel `lead_form_settings` terbaca anonim, sementara tabel `leads` tetap tidak dapat dibaca/ditulis anonim.
