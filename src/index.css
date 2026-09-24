@@ -553,6 +553,10 @@ body.public-lead-shell #root { max-width:none; }
 .public-lead-card form { display:grid; gap:15px; }
 .public-lead-card form>label { display:grid; gap:6px; color:#315743; font-size:13px; font-weight:600; }
 .public-lead-card input,.public-lead-card select,.public-lead-card textarea { width:100%; padding:11px 13px; border-radius:9px; border:1px solid #d7e7dc; background:white; font:inherit; color:#1c1c1e; }
+.public-lead-card .public-lead-choices { margin:0; padding:12px 14px; border:1px solid #d7e7dc; border-radius:9px; }
+.public-lead-choices legend { color:#315743; font-size:13px; font-weight:600; padding:0 5px; }
+.public-lead-choices label { display:flex; align-items:center; gap:10px; margin:8px 0; font-size:13px; cursor:pointer; }
+.public-lead-card .public-lead-choices input { width:17px; height:17px; flex:none; accent-color:#1b4332; }
 .public-lead-card form>button { border:0; border-radius:9px; padding:14px; background:#1b4332; color:white; font-weight:700; font-size:14px; cursor:pointer; }
 .public-lead-card form>button:disabled { opacity:.55; cursor:not-allowed; }
 .public-lead-card form>small { color:#75857b; font-size:11px; line-height:1.5; }

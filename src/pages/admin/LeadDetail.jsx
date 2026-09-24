@@ -104,7 +104,7 @@ export default function LeadDetail({ lead, admins, isSuperadmin, onClose, onChan
         {Object.keys(lead.form_answers || {}).length > 0 && <div className="lead-detail-facts">
           {Object.entries(lead.form_answers).map(([key,value]) => <div key={key}>
             <span>{(typeof value === 'object' && value?.label) || fieldLabels[key] || 'Jawaban tambahan'}</span>
-            <strong>{String(typeof value === 'object' && value !== null ? value.value : value)}</strong>
+            <strong>{Array.isArray(value?.value) ? value.value.join(', ') : String(typeof value === 'object' && value !== null ? value.value : value)}</strong>
           </div>)}
         </div>}
         {lead.notes && <p className="lead-detail-initial">Catatan awal: {lead.notes}</p>}
