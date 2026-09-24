@@ -4,6 +4,8 @@ Halaman publik ada di `https://app.damargaleri.com/daftar`. Website utama bisa m
 
 Lead baru belum ditugaskan kepada PM. Superadmin melihatnya di **Calon client → Detail & follow-up → Ditangani oleh**, kemudian memilih PM yang bertanggung jawab. Setelah itu lead terlihat di akun PM tersebut.
 
+Pertanyaan acara menerima tanggal pasti, perkiraan bulan–tahun, atau belum diketahui. Perkiraan bulan disimpan terpisah dan tidak membuat tanggal palsu di kalender. Saat **Jadikan project**, tim mengonfirmasi nama kedua calon pengantin, tanggal/perkiraan bulan, kota, venue, paket, budget, dan PM. Checklist langsung dibuat; tanggal target dari template tetap kosong sampai tanggal pasti ditetapkan. Ketika tanggal pasti kemudian disimpan, tenggat otomatis yang belum pernah diubah akan dijadwalkan; tenggat yang sudah diedit manual tetap dipertahankan. Akun client tidak dibuat oleh konversi: gunakan undangan dari daftar project setelah email client dikonfirmasi.
+
 ## Sebelum mengaktifkan halaman
 
 1. Jalankan migrasi `supabase/20260924_public_lead_form.sql` di project Supabase yang digunakan aplikasi. Pastikan tabel `lead_form_settings` terbaca anonim, sementara tabel `leads` tetap tidak dapat dibaca/ditulis anonim.
