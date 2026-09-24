@@ -127,6 +127,94 @@ input, button, select, textarea {
 
 body { overscroll-behavior: none; }
 
+/* ── Admin Project 360 ── */
+.project360 { min-width: 0; }
+.project360 button, .project360 a { transition: opacity .15s ease, transform .15s ease; }
+.project360 button:hover, .project360 a:hover { opacity: .82; }
+.project360-topline { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.project360-topline > button { border:0; background:none; color:#2D6A4F; cursor:pointer; font-size:11px; font-weight:650; padding:6px 0; }
+.project360-topline > div { display:flex; gap:7px; }
+.project360-topline > div button, .project360-topline > div a { border:1px solid #D8E7DC; border-radius:8px; background:#fff; color:#2D6A4F; cursor:pointer; font-size:10px; font-weight:650; padding:7px 10px; text-decoration:none; }
+.project360-hero { display:flex; align-items:flex-end; justify-content:space-between; gap:20px; border-radius:16px; background:linear-gradient(135deg,#1B4332,#2D6A4F); color:#fff; padding:24px 26px; margin-bottom:14px; }
+.project360-hero > div:first-child > span { color:rgba(255,255,255,.6); font-size:9px; font-weight:750; letter-spacing:.14em; }
+.project360-hero h1 { margin:5px 0 6px; font:700 27px/1.15 'Lora',serif; font-style:italic; }
+.project360-hero p { margin:0; color:rgba(255,255,255,.7); font-size:11px; }
+.project360-status { min-width:170px; text-align:right; }
+.project360-status > span { display:inline-block; border:1px solid rgba(255,255,255,.25); border-radius:20px; background:rgba(255,255,255,.12); padding:4px 9px; font-size:9px; font-weight:700; text-transform:capitalize; }
+.project360-status p { margin-top:10px; }
+.project360-status small { display:block; margin-top:3px; color:rgba(255,255,255,.55); font-size:9px; }
+.project360-error { margin-bottom:12px; border:1px solid #F2C7C2; border-radius:9px; background:#FFF5F4; color:#A93226; font-size:10px; padding:10px 12px; }
+.project360-kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-bottom:14px; }
+.project360-kpis article { border:1px solid #E2EDE6; border-radius:12px; background:#fff; padding:14px 15px; }
+.project360-kpis span,.project360-kpis small { display:block; color:#8A8A8E; font-size:9px; }
+.project360-kpis strong { display:block; margin:7px 0 5px; color:#1B4332; font:700 22px/1 'Lora',serif; }
+.project360 .is-danger { color:#B23A2D !important; }
+.project360-columns { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr); gap:14px; margin-bottom:14px; }
+.project360-columns--equal { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.project360-card { min-width:0; border:1px solid #E2EDE6; border-radius:14px; background:#fff; padding:17px; }
+.project360-card-title { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.project360-card-title span { color:#2D6A4F; font-size:9px; font-weight:750; letter-spacing:.12em; }
+.project360-card-title h2 { margin-top:3px; color:#1C1C1E; font:650 15px/1.2 'Lora',serif; }
+.project360-card-title > strong { color:#6C7570; font-size:10px; }
+.project360-card-title button { border:1px solid #D8E7DC; border-radius:7px; background:#F0FAF3; color:#2D6A4F; cursor:pointer; font-size:9px; font-weight:700; padding:7px 9px; }
+.project360-event-form { display:grid; grid-template-columns:1.5fr 1fr 1fr .8fr; gap:7px; border-radius:10px; background:#F6F8F6; padding:10px; margin-bottom:10px; }
+.project360-event-form input,.project360-event-form select { min-width:0; border:1px solid #DDE8E0; border-radius:7px; background:#fff; color:#333; font-size:9px; padding:8px; outline:none; }
+.project360-event-form button { grid-column:span 2; border:0; border-radius:7px; background:#1B4332; color:#fff; cursor:pointer; font-size:9px; font-weight:700; padding:8px; }
+.project360-event { display:grid; grid-template-columns:42px minmax(0,1fr) auto; align-items:center; gap:10px; border-top:1px solid #EDF2EE; padding:10px 0; }
+.project360-date { border-radius:8px; background:#F0FAF3; color:#1B4332; padding:6px 3px; text-align:center; }
+.project360-date strong,.project360-date span { display:block; }
+.project360-date strong { font:700 15px/1 'Lora',serif; }
+.project360-date span { margin-top:3px; font-size:8px; text-transform:uppercase; }
+.project360-event > div:nth-child(2) { min-width:0; }
+.project360-event > div:nth-child(2) strong,.project360-event > div:nth-child(2) span,.project360-event > div:nth-child(2) small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.project360-event > div:nth-child(2) strong { color:#242624; font-size:11px; }
+.project360-event > div:nth-child(2) span { margin-top:3px; color:#656A66; font-size:9px; }
+.project360-event > div:nth-child(2) small { margin-top:2px; color:#979A97; font-size:8px; }
+.project360-event-actions { display:flex; align-items:center; gap:5px; }
+.project360-event-actions button { border:1px solid #D8E7DC; border-radius:6px; background:#fff; color:#2D6A4F; cursor:pointer; font-size:8px; padding:5px 7px; }
+.project360-event-actions .danger { color:#B23A2D; border-color:#F2C7C2; }
+.project360-event-actions span { color:#2D6A4F; font-size:8px; font-weight:700; }
+.project360-progress,.project360-budget-track { overflow:hidden; height:5px; border-radius:10px; background:#EDF2EE; margin:2px 0 8px; }
+.project360-progress i,.project360-budget-track i { display:block; height:100%; border-radius:inherit; background:#52B788; }
+.project360-task { display:grid; grid-template-columns:8px minmax(0,1fr) auto; align-items:center; gap:8px; border-top:1px solid #EDF2EE; padding:11px 0; }
+.project360-task > i { width:6px; height:6px; border-radius:50%; background:#D59A2E; }
+.project360-task > i.late { background:#C0392B; }
+.project360-task strong,.project360-task span { display:block; }
+.project360-task strong { color:#2B2D2B; font-size:10px; line-height:1.35; }
+.project360-task span { margin-top:3px; color:#8A8A8E; font-size:8px; }
+.project360-task small { color:#6C7570; font-size:8px; white-space:nowrap; }
+.project360-client { display:flex; align-items:center; justify-content:space-between; gap:10px; border-top:1px solid #EDF2EE; padding:11px 0; }
+.project360-client strong,.project360-client span { display:block; }
+.project360-client strong { color:#292B29; font-size:11px; }
+.project360-client span { margin-top:3px; color:#8A8A8E; font-size:9px; }
+.project360-client b { border-radius:20px; background:#F4F4F4; color:#777; font-size:8px; padding:4px 8px; }
+.project360-client b.client-accepted { background:#F0FAF3; color:#2D6A4F; }
+.project360-client b.client-error { background:#FFF5F4; color:#B23A2D; }
+.project360-money { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; margin-bottom:12px; }
+.project360-money div { border-radius:9px; background:#F7F9F7; padding:10px; }
+.project360-money span,.project360-money strong { display:block; }
+.project360-money span { color:#8A8A8E; font-size:8px; }
+.project360-money strong { margin-top:5px; color:#1B4332; font:650 11px 'Lora',serif; }
+.project360-audit { margin-bottom:20px; }
+.project360-audit-row { display:grid; grid-template-columns:8px minmax(0,1fr) auto; align-items:center; gap:9px; border-top:1px solid #EDF2EE; padding:10px 0; }
+.project360-audit-row > i { width:6px; height:6px; border-radius:50%; background:#52B788; }
+.project360-audit-row strong,.project360-audit-row span { display:block; }
+.project360-audit-row strong { color:#303330; font-size:10px; text-transform:capitalize; }
+.project360-audit-row span { margin-top:2px; color:#9A9D9A; font-size:8px; }
+.project360-audit-row time { color:#7A7E7A; font-size:8px; white-space:nowrap; }
+.project360-empty { color:#8A8A8E; font-size:10px; line-height:1.5; padding:20px 4px; text-align:center; }
+
+@media (max-width: 760px) {
+  .project360-topline,.project360-hero { align-items:flex-start; flex-direction:column; }
+  .project360-status { min-width:0; text-align:left; }
+  .project360-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .project360-columns,.project360-columns--equal { grid-template-columns:1fr; }
+  .project360-event-form { grid-template-columns:1fr 1fr; }
+  .project360-event-form button { grid-column:span 2; }
+  .project360-event { grid-template-columns:42px minmax(0,1fr); }
+  .project360-event-actions { grid-column:2; }
+}
+
 /* ── Superadmin operational overview ── */
 .overview-heading {
   display: flex;
