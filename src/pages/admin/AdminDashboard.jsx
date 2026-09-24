@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 
 const AdminProject360 = lazy(() => import('./AdminProject360'))
+const LeadDetail = lazy(() => import('./LeadDetail'))
 
 const G900='#1B4332',G700='#2D6A4F',G500='#52B788',G100='#D8F3DC',G50='#F0FAF3'
 const DARK='#1C1C1E',MID='#3D3D3A',MUTED='#8A8A8E',BORDER='#E2EDE6',WHITE='#FFFFFF',RED='#C0392B'
@@ -77,6 +78,7 @@ export default function AdminDashboard() {
   const [leadErr, setLeadErr] = useState('')
   const [savingLead, setSavingLead] = useState(false)
   const [convertBusy, setConvertBusy] = useState(null)
+  const [selectedLead, setSelectedLead] = useState(null)
 
   useEffect(() => {
     document.body.classList.add('admin-shell')
@@ -175,11 +177,22 @@ export default function AdminDashboard() {
   }
 
   async function updateLeadStatus(lead, status) {
+    if (status === 'booked' && !lead.converted_project_id) {
+      window.alert('Ubah menjadi project melalui tombol “Jadikan project” agar status booking dan data project tetap sinkron.')
+      return
+    }
     const { error } = await supabase.from('leads')
       .update({ status, updated_at: new Date().toISOString() })
       .eq('id', lead.id)
     if (error) window.alert('Gagal mengubah status: ' + error.message)
-    else fetchLeads()
+    else {
+      const { error: historyError } = await supabase.from('lead_activities').insert({
+        lead_id:lead.id, activity_type:'status_change',
+        description:`Status diubah dari ${lead.status} menjadi ${status}`,
+      })
+      if (historyError) window.alert('Status tersimpan, tetapi riwayat perubahan gagal dicatat: ' + historyError.message)
+      fetchLeads()
+    }
   }
 
   async function handleConvertLead(lead) {
@@ -904,15 +917,17 @@ export default function AdminDashboard() {
                   <div style={{display:'flex',justifyContent:'space-between',gap:12}}>
                     <div><p style={{fontSize:14,fontWeight:600,margin:'0 0 3px',color:DARK}}>{l.contact_name}</p><p style={{fontSize:11,color:MUTED,margin:0}}>{[l.bride_name&&l.groom_name?`${l.bride_name} & ${l.groom_name}`:l.bride_name||l.groom_name,l.phone,l.location].filter(Boolean).join(' · ')}</p></div>
                     <select value={l.status} onChange={e=>updateLeadStatus(l,e.target.value)} style={inp({width:'auto',minWidth:118,padding:'6px 8px',fontSize:11,appearance:'none'})}>
-                      <option value="new">Baru</option><option value="contacted">Dihubungi</option><option value="meeting">Meeting</option><option value="proposal">Penawaran</option><option value="follow_up">Follow-up</option><option value="booked">Booking</option><option value="lost">Batal</option>
+                      <option value="new">Baru</option><option value="contacted">Dihubungi</option><option value="meeting">Meeting</option><option value="proposal">Penawaran</option><option value="follow_up">Follow-up</option><option value="booked" disabled={!l.converted_project_id}>Booking</option><option value="lost">Batal</option>
                     </select>
                   </div>
                   <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:10}}>
                     <span style={{fontSize:10,padding:'3px 7px',borderRadius:20,background:G50,color:G700}}>{l.source || 'manual'}</span>
                     {l.event_date&&<span style={{fontSize:10,padding:'3px 7px',borderRadius:20,background:'#F5F5F5',color:MID}}>Acara {new Date(l.event_date).toLocaleDateString('id-ID')}</span>}
                     <span style={{fontSize:10,padding:'3px 7px',borderRadius:20,background:'#F5F5F5',color:MID}}>PM: {l.profiles?.full_name||'Belum ditugaskan'}</span>
+                    {l.next_follow_up_at && <span style={{fontSize:10,padding:'3px 7px',borderRadius:20,background:new Date(l.next_follow_up_at)<new Date()?'#FFF1EE':AMBERBG,color:new Date(l.next_follow_up_at)<new Date()?RED:AMBER}}>Follow-up: {new Date(l.next_follow_up_at).toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'})}</span>}
                   </div>
-                  <div style={{display:'flex',justifyContent:'flex-end',marginTop:10}}>
+                  <div style={{display:'flex',justifyContent:'flex-end',gap:7,marginTop:10}}>
+                    <button onClick={() => setSelectedLead(l)} style={{fontSize:11,padding:'6px 10px',border:`1px solid ${G100}`,borderRadius:7,background:WHITE,color:G700,fontWeight:600,cursor:'pointer'}}>Detail & follow-up</button>
                     {l.converted_project_id ? (
                       <button onClick={()=>setView('projects')} style={{fontSize:11,padding:'6px 10px',border:`1px solid ${G100}`,borderRadius:7,background:G50,color:G700,fontWeight:600,cursor:'pointer'}}>Lihat project</button>
                     ) : (
@@ -926,6 +941,13 @@ export default function AdminDashboard() {
               </div>}
             </div>
           </div>
+        )}
+
+        {selectedLead && (
+          <Suspense fallback={null}>
+            <LeadDetail lead={selectedLead} onClose={() => setSelectedLead(null)}
+              onChanged={updated => { setSelectedLead(updated); fetchLeads() }}/>
+          </Suspense>
         )}
 
         {/* ── NEW PROJECT FORM ── */}
