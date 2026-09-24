@@ -69,6 +69,7 @@ export default function AdminDashboard() {
   })
   const [leadErr, setLeadErr] = useState('')
   const [savingLead, setSavingLead] = useState(false)
+  const [convertBusy, setConvertBusy] = useState(null)
 
   useEffect(() => {
     fetchProjects()
@@ -145,6 +146,27 @@ export default function AdminDashboard() {
       .eq('id', lead.id)
     if (error) window.alert('Gagal mengubah status: ' + error.message)
     else fetchLeads()
+  }
+
+  async function handleConvertLead(lead) {
+    if (!lead.bride_name?.trim() || !lead.groom_name?.trim()) {
+      window.alert('Lengkapi nama kedua calon pengantin sebelum membuat project.')
+      return
+    }
+    const confirmed = window.confirm(
+      `Jadikan ${lead.bride_name} & ${lead.groom_name} sebagai project aktif?\n\nChecklist standar dan kategori budget akan dibuat otomatis.`
+    )
+    if (!confirmed) return
+    setConvertBusy(lead.id)
+    try {
+      await invokeAccess({ action:'convert_lead', lead_id:lead.id })
+      await Promise.all([fetchLeads(), fetchProjects()])
+      setView('projects')
+    } catch (err) {
+      window.alert('Gagal membuat project: ' + err.message)
+    } finally {
+      setConvertBusy(null)
+    }
   }
 
   async function invokeAccess(body) {
@@ -700,6 +722,16 @@ export default function AdminDashboard() {
                     <span style={{fontSize:10,padding:'3px 7px',borderRadius:20,background:G50,color:G700}}>{l.source || 'manual'}</span>
                     {l.event_date&&<span style={{fontSize:10,padding:'3px 7px',borderRadius:20,background:'#F5F5F5',color:MID}}>Acara {new Date(l.event_date).toLocaleDateString('id-ID')}</span>}
                     <span style={{fontSize:10,padding:'3px 7px',borderRadius:20,background:'#F5F5F5',color:MID}}>PM: {l.profiles?.full_name||'Belum ditugaskan'}</span>
+                  </div>
+                  <div style={{display:'flex',justifyContent:'flex-end',marginTop:10}}>
+                    {l.converted_project_id ? (
+                      <button onClick={()=>setView('projects')} style={{fontSize:11,padding:'6px 10px',border:`1px solid ${G100}`,borderRadius:7,background:G50,color:G700,fontWeight:600,cursor:'pointer'}}>Lihat project</button>
+                    ) : (
+                      <button onClick={()=>handleConvertLead(l)} disabled={convertBusy===l.id}
+                        style={{fontSize:11,padding:'6px 10px',border:0,borderRadius:7,background:convertBusy===l.id?MUTED:G900,color:WHITE,fontWeight:600,cursor:convertBusy===l.id?'not-allowed':'pointer'}}>
+                        {convertBusy===l.id?'Membuat project…':'Jadikan project'}
+                      </button>
+                    )}
                   </div>
                 </div>)}
               </div>}
