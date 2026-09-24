@@ -18,6 +18,12 @@ body {
   min-height: 100dvh;
 }
 
+@media (max-width: 760px) {
+  .admin-leads-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 #root {
   width: 100%;
   max-width: 430px;
