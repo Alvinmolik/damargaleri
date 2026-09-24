@@ -127,6 +127,41 @@ input, button, select, textarea {
 
 body { overscroll-behavior: none; }
 
+/* CRM lead details */
+.lead-detail-backdrop { position:fixed; inset:0; z-index:110; display:flex; justify-content:flex-end; background:rgba(13,34,25,.48); }
+.lead-detail { width:min(520px,100%); height:100%; overflow:auto; background:#fff; box-shadow:-12px 0 30px rgba(0,0,0,.12); }
+.lead-detail-header { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; padding:22px 24px; background:#1B4332; color:#fff; }
+.lead-detail-header span { font-size:10px; letter-spacing:.1em; color:#A7D6B8; }
+.lead-detail-header h2 { font:600 23px/1.3 'Lora',serif; margin:4px 0; }
+.lead-detail-header p { font-size:11px; color:#D0E2D5; }
+.lead-detail-header button { border:0; background:transparent; color:#fff; cursor:pointer; font-size:20px; }
+.lead-detail-body { padding:20px 24px 32px; }
+.lead-detail-facts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.lead-detail-facts div { min-width:0; border:1px solid #E2EDE6; border-radius:8px; padding:10px; }
+.lead-detail-facts span,.lead-detail-facts strong { display:block; overflow-wrap:anywhere; }
+.lead-detail-facts span { color:#858D86; font-size:10px; }
+.lead-detail-facts strong { color:#1B4332; font-size:12px; margin-top:4px; }
+.lead-detail-initial { margin:14px 0; padding:12px; background:#F0FAF3; border-radius:8px; color:#2D6A4F; font-size:11px; white-space:pre-wrap; }
+.lead-detail-followup { margin:16px 0; padding:14px; background:#F6F8F6; border-radius:10px; }
+.lead-detail-followup label,.lead-detail-activity label { display:block; margin-bottom:8px; font-size:11px; font-weight:700; color:#1B4332; }
+.lead-detail-followup > div { display:flex; gap:8px; }
+.lead-detail input,.lead-detail select,.lead-detail textarea { min-width:0; border:1px solid #D8E7DC; border-radius:7px; padding:9px; color:#232723; background:#fff; font-size:12px; }
+.lead-detail-followup input { flex:1; }
+.lead-detail button:not(.lead-detail-header button) { border:0; border-radius:7px; padding:9px 12px; background:#1B4332; color:#fff; cursor:pointer; font-size:11px; font-weight:650; }
+.lead-detail button:disabled { opacity:.45; cursor:not-allowed; }
+.lead-detail h3 { margin:20px 0 8px; font:600 16px 'Lora',serif; color:#1B4332; }
+.lead-detail-empty { padding:18px 0; color:#8A8A8E; font-size:11px; }
+.lead-detail-timeline article { padding:11px 0 11px 13px; border-left:2px solid #B7DDC3; border-bottom:1px solid #EDF2EE; }
+.lead-detail-timeline strong { color:#2D6A4F; font-size:11px; }
+.lead-detail-timeline time { float:right; color:#929892; font-size:9px; }
+.lead-detail-timeline p { clear:both; margin-top:6px; color:#383E39; font-size:11px; white-space:pre-wrap; }
+.lead-detail-activity { display:grid; gap:9px; margin-top:18px; }
+.lead-detail-activity label { margin:0; }
+.lead-detail-activity textarea { resize:vertical; }
+.lead-detail-activity button { justify-self:start; }
+.lead-detail-error { color:#C0392B; font-size:11px; }
+@media(max-width:520px) { .lead-detail-body,.lead-detail-header { padding-left:16px; padding-right:16px; } .lead-detail-followup > div { flex-direction:column; } }
+
 /* ── Admin Project 360 ── */
 .project360 { min-width: 0; }
 .project360 button, .project360 a { transition: opacity .15s ease, transform .15s ease; }
