@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY
-const allowedTypes = new Set(['text', 'tel', 'email', 'date', 'number', 'textarea', 'select'])
+const allowedTypes = new Set(['text', 'tel', 'email', 'date', 'number', 'textarea', 'select', 'checkbox'])
 
 function Turnstile({ onToken, resetKey }) {
   const container = useRef(null)
@@ -65,6 +65,8 @@ export default function PublicLeadForm() {
   async function submit(event) {
     event.preventDefault()
     if (!token) return setError('Selesaikan verifikasi keamanan dulu.')
+    if (settings.fields.some(field => field.enabled !== false && field.type === 'checkbox' &&
+      field.required && !(answers[field.key] || []).length)) return setError('Lengkapi pertanyaan checklist yang wajib diisi.')
     if (!answers.contact_name?.trim() || (!answers.phone?.trim() && !answers.email?.trim())) {
       return setError('Isi nama dan minimal nomor WhatsApp atau email.')
     }
@@ -94,6 +96,15 @@ export default function PublicLeadForm() {
         <form onSubmit={submit}>
           {settings.fields.map(field => {
             if (!field.key || field.enabled === false || !allowedTypes.has(field.type)) return null
+            if (field.type === 'checkbox') return <fieldset className="public-lead-choices" key={field.key}>
+              <legend>{field.label}{field.required && ' *'}</legend>
+              {(field.options || []).map(option => <label key={option}>
+                <input type="checkbox" checked={(answers[field.key] || []).includes(option)} onChange={e => setAnswers(current => {
+                  const selected = current[field.key] || []
+                  return {...current,[field.key]:e.target.checked ? [...selected,option] : selected.filter(item => item !== option)}
+                })}/>{option}
+              </label>)}
+            </fieldset>
             return <label key={field.key}>{field.label}{field.required && ' *'}
               {field.type === 'textarea' ? <textarea maxLength="500" rows="3" required={field.required} value={answers[field.key] || ''} onChange={e => setAnswers(a => ({...a,[field.key]:e.target.value}))}/>
                 : field.type === 'select' ? <select required={field.required} value={answers[field.key] || ''} onChange={e => setAnswers(a => ({...a,[field.key]:e.target.value}))}>
