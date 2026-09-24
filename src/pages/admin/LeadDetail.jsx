@@ -8,13 +8,33 @@ function displayDate(value) {
   return value ? new Date(value).toLocaleString('id-ID', { dateStyle:'medium', timeStyle:'short' }) : 'Belum dijadwalkan'
 }
 
-export default function LeadDetail({ lead, onClose, onChanged }) {
+export default function LeadDetail({ lead, admins, isSuperadmin, onClose, onChanged }) {
   const [activities, setActivities] = useState([])
   const [activity, setActivity] = useState(emptyActivity)
   const [followUp, setFollowUp] = useState('')
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [fieldLabels, setFieldLabels] = useState({})
+
+  async function assignPm(event) {
+    const owner = event.target.value || null
+    setBusy(true); setError('')
+    const { data, error: updateError } = await supabase.from('leads')
+      .update({ owner_admin:owner }).eq('id', lead.id).select('id, owner_admin').single()
+    if (updateError || !data) setError(`Gagal menugaskan PM: ${updateError?.message || 'Akses ditolak.'}`)
+    else onChanged({ ...lead, owner_admin:data.owner_admin })
+    setBusy(false)
+  }
+
+  useEffect(() => {
+    let active = true
+    supabase.from('lead_form_settings').select('fields').eq('id', 1).single()
+      .then(({data}) => {
+        if (active && Array.isArray(data?.fields)) setFieldLabels(Object.fromEntries(data.fields.map(field => [field.key,field.label])))
+      })
+    return () => { active = false }
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -74,6 +94,19 @@ export default function LeadDetail({ lead, onClose, onChanged }) {
           <div><span>Paket</span><strong>{lead.interested_package || '—'}</strong></div>
           <div><span>Follow-up berikutnya</span><strong>{displayDate(lead.next_follow_up_at)}</strong></div>
         </div>
+        {isSuperadmin && <label className="lead-detail-owner">Ditangani oleh
+          <select value={lead.owner_admin || ''} onChange={assignPm} disabled={busy}>
+            <option value="">Belum ditugaskan (superadmin)</option>
+            {admins.filter(admin => admin.role === 'admin' || admin.role === 'superadmin')
+              .map(admin => <option value={admin.id} key={admin.id}>{admin.full_name}</option>)}
+          </select>
+        </label>}
+        {Object.keys(lead.form_answers || {}).length > 0 && <div className="lead-detail-facts">
+          {Object.entries(lead.form_answers).map(([key,value]) => <div key={key}>
+            <span>{(typeof value === 'object' && value?.label) || fieldLabels[key] || 'Jawaban tambahan'}</span>
+            <strong>{String(typeof value === 'object' && value !== null ? value.value : value)}</strong>
+          </div>)}
+        </div>}
         {lead.notes && <p className="lead-detail-initial">Catatan awal: {lead.notes}</p>}
         <form className="lead-detail-followup" onSubmit={saveFollowUp}>
           <label htmlFor="lead-next-followup">Jadwalkan follow-up (waktu lokal perangkat)</label>
