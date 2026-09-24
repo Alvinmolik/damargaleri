@@ -38,6 +38,7 @@ export default function PublicLeadForm() {
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
   const [answers, setAnswers] = useState({})
+  const [dateMode, setDateMode] = useState('unknown')
   const [token, setToken] = useState('')
   const [resetKey, setResetKey] = useState(0)
   const [error, setError] = useState('')
@@ -70,6 +71,11 @@ export default function PublicLeadForm() {
     if (!answers.contact_name?.trim() || (!answers.phone?.trim() && !answers.email?.trim())) {
       return setError('Isi nama dan minimal nomor WhatsApp atau email.')
     }
+    if (settings.fields.some(field => field.key === 'event_date' && field.enabled !== false &&
+      ((field.required && dateMode === 'unknown') ||
+       (dateMode === 'date' && !answers.event_date) || (dateMode === 'month' && !answers.estimated_event_month)))) {
+      return setError('Lengkapi tanggal atau perkiraan bulan acara.')
+    }
     setSending(true); setError('')
     const query = new URLSearchParams(window.location.search)
     const tracking = Object.fromEntries(['utm_source', 'utm_medium', 'utm_campaign'].map(key => [key, query.get(key) || '']))
@@ -96,6 +102,20 @@ export default function PublicLeadForm() {
         <form onSubmit={submit}>
           {settings.fields.map(field => {
             if (!field.key || field.enabled === false || !allowedTypes.has(field.type)) return null
+            if (field.key === 'event_date' && field.type === 'date') return <fieldset className="public-lead-choices" key={field.key}>
+              <legend>Rencana waktu acara{field.required && ' *'}</legend>
+              <select value={dateMode} onChange={e => {
+                const mode = e.target.value
+                setDateMode(mode)
+                setAnswers(current => ({...current,event_date:'',estimated_event_month:''}))
+              }}>
+                <option value="unknown">Belum diketahui</option>
+                <option value="month">Perkiraan bulan dan tahun</option>
+                <option value="date">Tanggal sudah pasti</option>
+              </select>
+              {dateMode === 'date' && <input aria-label="Tanggal acara" type="date" required value={answers.event_date || ''} onChange={e => setAnswers(current => ({...current,event_date:e.target.value}))}/>}
+              {dateMode === 'month' && <input aria-label="Perkiraan bulan acara" type="month" required value={answers.estimated_event_month || ''} onChange={e => setAnswers(current => ({...current,estimated_event_month:e.target.value}))}/>}
+            </fieldset>
             if (field.type === 'checkbox') return <fieldset className="public-lead-choices" key={field.key}>
               <legend>{field.label}{field.required && ' *'}</legend>
               {(field.options || []).map(option => <label key={option}>
