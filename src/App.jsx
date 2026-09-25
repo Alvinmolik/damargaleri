@@ -162,7 +162,7 @@ export default function App({slug,readOnly=false}){
     document.title=title;
     const m=(p,v,a="name")=>{let el=document.querySelector(`meta[${a}="${p}"]`);if(!el){el=document.createElement("meta");el.setAttribute(a,p);document.head.appendChild(el);}el.setAttribute("content",v);};
     m("description",desc);m("og:title",title,"property");m("og:description",desc,"property");
-    m("og:image",project.cover_image_url||`${window.location.origin}/cover-default.jpg`,"property");
+    m("og:image",project.cover_image_url||`${window.location.origin}/damargaleri-organizer-logo.png`,"property");
   },[project]);
 
   useEffect(()=>{
@@ -192,7 +192,8 @@ export default function App({slug,readOnly=false}){
   const invoices=project.invoices||[];
   const docs=project.documents||[];
   const pkg=project.packages;
-  const coverImg=project.cover_image_url||"/cover-default.jpg";
+  const coverImg=project.cover_image_url||null;
+  const coverBackground={backgroundColor:G900,backgroundImage:"radial-gradient(ellipse at 85% 12%,rgba(181,210,174,.28),transparent 52%),radial-gradient(ellipse at 8% 65%,rgba(198,167,124,.2),transparent 55%),linear-gradient(155deg,#244d39,#16382c 65%,#0d2b25)"};
   const coupleNames=`${project.bride_name} & ${project.groom_name}`;
   const weddingDate=project.wedding_date?new Date(project.wedding_date).toLocaleDateString("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"}):project.estimated_wedding_month?`Perkiraan ${new Date(`${project.estimated_wedding_month}-01T12:00:00`).toLocaleDateString("id-ID",{month:"long",year:"numeric"})}`:"Tanggal belum diset";
   const pmWA=project.profiles?.wa_number||pkg?.wa_number||"6288213767999";
@@ -337,10 +338,10 @@ export default function App({slug,readOnly=false}){
         {tab==="home"&&(
           <div>
             {/* Cover hero */}
-            <div style={{position:"relative",height:380,overflow:"hidden",background:G900}}>
-              <img src={coverImg} alt="Cover"
+            <div style={{position:"relative",height:380,overflow:"hidden",...coverBackground}}>
+              {coverImg&&<img key={coverImg} src={coverImg} alt="Foto cover project"
                 style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:`center ${coverPos}%`,transition:"object-position .2s"}}
-                onError={e=>{e.target.src="/cover-default.jpg"}}/>
+                onError={e=>{e.currentTarget.style.display="none"}}/>}
               <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(0,0,0,.04) 0%,rgba(27,67,50,.92) 100%)"}}/>
               {editingCover?(
                 <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.55)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:"0 28px"}}>
@@ -353,7 +354,7 @@ export default function App({slug,readOnly=false}){
                 </div>
               ):(
                 <div style={{position:"absolute",top:12,right:12,display:"flex",gap:6}}>
-                  <button onClick={()=>setEditingCover(true)} style={{padding:"5px 10px",fontSize:10,fontWeight:600,background:"rgba(0,0,0,.35)",color:"#fff",backdropFilter:"blur(8px)",border:"1px solid rgba(255,255,255,.2)",borderRadius:20,cursor:"pointer"}}>Atur posisi</button>
+                  {coverImg&&<button onClick={()=>setEditingCover(true)} style={{padding:"5px 10px",fontSize:10,fontWeight:600,background:"rgba(0,0,0,.35)",color:"#fff",backdropFilter:"blur(8px)",border:"1px solid rgba(255,255,255,.2)",borderRadius:20,cursor:"pointer"}}>Atur posisi</button>}
                   <button onClick={()=>coverRef.current.click()} style={{padding:"5px 10px",fontSize:10,fontWeight:600,background:"rgba(0,0,0,.35)",color:"#fff",backdropFilter:"blur(8px)",border:"1px solid rgba(255,255,255,.2)",borderRadius:20,cursor:"pointer"}}>Ganti foto</button>
                 </div>
               )}
@@ -670,8 +671,8 @@ export default function App({slug,readOnly=false}){
         {tab==="pernikahan"&&subW==="detail"&&(
           <div>
             {/* Cover banner — taller, full */}
-            <div style={{position:"relative",height:240,overflow:"hidden",background:G900}}>
-              <img src={coverImg} alt="Cover" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:`center ${coverPos}%`}} onError={e=>{e.target.src="/cover-default.jpg"}}/>
+            <div style={{position:"relative",height:240,overflow:"hidden",...coverBackground}}>
+              {coverImg&&<img key={coverImg} src={coverImg} alt="Foto cover project" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:`center ${coverPos}%`}} onError={e=>{e.currentTarget.style.display="none"}}/>}
               <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(0,0,0,.1) 0%,rgba(27,67,50,.9) 100%)"}}/>
               <div style={{position:"absolute",bottom:20,left:24,right:24}}>
                 <p style={{fontSize:10,color:"rgba(255,255,255,.5)",letterSpacing:".12em",textTransform:"uppercase",margin:"0 0 4px"}}>Pernikahan</p>
