@@ -4,6 +4,18 @@ import { supabase } from '../lib/supabase'
 const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY
 const allowedTypes = new Set(['text', 'tel', 'email', 'date', 'number', 'textarea', 'select', 'checkbox'])
 
+function selectedDateLabel(value, monthOnly = false) {
+  if (!value) return ''
+  const parts = value.split('-').map(Number)
+  if (parts.length !== (monthOnly ? 2 : 3) || parts.some(part => !Number.isInteger(part))) return ''
+  const date = new Date(parts[0], parts[1] - 1, monthOnly ? 1 : parts[2])
+  if (date.getFullYear() !== parts[0] || date.getMonth() !== parts[1] - 1 ||
+    !monthOnly && date.getDate() !== parts[2]) return ''
+  return new Intl.DateTimeFormat('id-ID', monthOnly
+    ? { month:'long', year:'numeric' }
+    : { day:'numeric', month:'long', year:'numeric' }).format(date)
+}
+
 function Turnstile({ onToken, resetKey }) {
   const container = useRef(null)
   useEffect(() => {
@@ -36,6 +48,9 @@ function Turnstile({ onToken, resetKey }) {
 
 export default function PublicLeadForm() {
   const [settings, setSettings] = useState(null)
+  const [packages, setPackages] = useState([])
+  const [promotions, setPromotions] = useState([])
+  const [catalogError, setCatalogError] = useState('')
   const [loading, setLoading] = useState(true)
   const [answers, setAnswers] = useState({})
   const [dateMode, setDateMode] = useState('unknown')
@@ -49,6 +64,19 @@ export default function PublicLeadForm() {
   useEffect(() => {
     document.body.classList.add('public-lead-shell')
     return () => document.body.classList.remove('public-lead-shell')
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    Promise.all([
+      supabase.from('service_packages').select('id, name, description, base_price').eq('is_active',true).order('sort_order'),
+      supabase.from('promotions').select('id, name, package_id, discount_type, discount_value').eq('is_active',true).order('name'),
+    ]).then(([p,promo]) => {
+      if (!active) return
+      if (p.error || promo.error) setCatalogError('Pilihan paket dan promo belum bisa dimuat. Silakan coba lagi nanti.')
+      else { setPackages(p.data || []); setPromotions(promo.data || []) }
+    })
+    return () => { active = false }
   }, [])
 
   useEffect(() => {
@@ -102,19 +130,53 @@ export default function PublicLeadForm() {
         <form onSubmit={submit}>
           {settings.fields.map(field => {
             if (!field.key || field.enabled === false || !allowedTypes.has(field.type)) return null
-            if (field.key === 'event_date' && field.type === 'date') return <fieldset className="public-lead-choices" key={field.key}>
+            if (field.key === 'interested_package') {
+              const available = promotions.filter(promo => !promo.package_id || promo.package_id === answers.package_id)
+              return <div className="public-lead-offer" key={field.key}>
+                <label>{field.label}{field.required && ' *'}
+                  <select required={field.required} value={answers.package_id || ''} onChange={e => {
+                    const selected = packages.find(pkg => pkg.id === e.target.value)
+                    setAnswers(current => ({...current,package_id:selected?.id || '', interested_package:selected?.name || '', promotion_id:''}))
+                  }}>
+                    <option value="">Belum memilih paket</option>
+                    {packages.map(pkg => <option key={pkg.id} value={pkg.id}>{pkg.name}{pkg.base_price != null ? ` · harga dasar Rp ${Number(pkg.base_price).toLocaleString('id-ID')}` : ''}</option>)}
+                  </select>
+                </label>
+                {answers.package_id && available.length > 0 && <label>Promo yang diminati (opsional)
+                  <select value={answers.promotion_id || ''} onChange={e => setAnswers(current => ({...current,promotion_id:e.target.value}))}>
+                    <option value="">Tanpa promo</option>
+                    {available.map(promo => <option key={promo.id} value={promo.id}>{promo.name} · {promo.discount_type === 'percent' ? `${promo.discount_value}%` : `Rp ${Number(promo.discount_value).toLocaleString('id-ID')}`}</option>)}
+                  </select>
+                </label>}
+                {catalogError && <small role="status">{catalogError}</small>}
+              </div>
+            }
+            if (field.key === 'event_date' && field.type === 'date') return <fieldset className="public-lead-choices public-lead-date" key={field.key}>
               <legend>Rencana waktu acara{field.required && ' *'}</legend>
-              <select value={dateMode} onChange={e => {
-                const mode = e.target.value
-                setDateMode(mode)
-                setAnswers(current => ({...current,event_date:'',estimated_event_month:''}))
-              }}>
-                <option value="unknown">Belum diketahui</option>
-                <option value="month">Perkiraan bulan dan tahun</option>
-                <option value="date">Tanggal sudah pasti</option>
-              </select>
-              {dateMode === 'date' && <input aria-label="Tanggal acara" type="date" required value={answers.event_date || ''} onChange={e => setAnswers(current => ({...current,event_date:e.target.value}))}/>}
-              {dateMode === 'month' && <input aria-label="Perkiraan bulan acara" type="month" required value={answers.estimated_event_month || ''} onChange={e => setAnswers(current => ({...current,estimated_event_month:e.target.value}))}/>}
+              <p className="public-lead-date-hint">Pilih informasi tanggal yang sudah kamu ketahui.</p>
+              <div className="public-lead-date-options">
+                {[
+                  ['unknown','Belum tahu tanggalnya'],
+                  ['month','Tahu bulan & tahun'],
+                  ['date','Tanggal sudah pasti'],
+                ].filter(([mode]) => !field.required || mode !== 'unknown').map(([mode,label]) => <label key={mode} className={`public-lead-date-option${dateMode === mode ? ' is-selected' : ''}`}>
+                  <input type="radio" name="event-date-mode" checked={dateMode === mode} onChange={() => {
+                    setDateMode(mode)
+                    setAnswers(current => ({...current,event_date:'',estimated_event_month:''}))
+                  }}/><span>{label}</span>
+                </label>)}
+              </div>
+              {dateMode === 'date' && <label className="public-lead-date-input">Pilih tanggal acara
+                <input type="date" required value={answers.event_date || ''} onChange={e => setAnswers(current => ({...current,event_date:e.target.value}))}/>
+              </label>}
+              {dateMode === 'month' && <label className="public-lead-date-input">Pilih perkiraan bulan dan tahun
+                <input type="month" required value={answers.estimated_event_month || ''} onChange={e => setAnswers(current => ({...current,estimated_event_month:e.target.value}))}/>
+              </label>}
+              {dateMode !== 'unknown' && <p className={`public-lead-date-summary${(dateMode === 'date' ? answers.event_date : answers.estimated_event_month) ? ' is-filled' : ''}`} role="status">
+                {(dateMode === 'date' ? selectedDateLabel(answers.event_date) : selectedDateLabel(answers.estimated_event_month,true))
+                  ? `✓ ${dateMode === 'date' ? 'Tanggal acara' : 'Perkiraan waktu acara'}: ${dateMode === 'date' ? selectedDateLabel(answers.event_date) : selectedDateLabel(answers.estimated_event_month,true)}`
+                  : 'Belum ada tanggal atau bulan yang dipilih.'}
+              </p>}
             </fieldset>
             if (field.type === 'checkbox') return <fieldset className="public-lead-choices" key={field.key}>
               <legend>{field.label}{field.required && ' *'}</legend>

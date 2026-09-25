@@ -6,6 +6,7 @@ const AdminProject360 = lazy(() => import('./AdminProject360'))
 const LeadDetail = lazy(() => import('./LeadDetail'))
 const AdminCalendar = lazy(() => import('./AdminCalendar'))
 const LeadFormSettings = lazy(() => import('./LeadFormSettings'))
+const OfferCatalog = lazy(() => import('./OfferCatalog'))
 const ConvertLeadDialog = lazy(() => import('./ConvertLeadDialog'))
 
 const G900='#1B4332',G700='#2D6A4F',G500='#52B788',G100='#D8F3DC',G50='#F0FAF3'
@@ -48,6 +49,8 @@ export default function AdminDashboard() {
   const [loading, setLoading]   = useState(true)
   const [leadsLoading, setLeadsLoading] = useState(false)
   const [view, setView]         = useState('overview')
+  const [offerPackages, setOfferPackages] = useState([])
+  const [offerPromotions, setOfferPromotions] = useState([])
   const [form, setForm]         = useState({
     bride_name: '', groom_name: '', wedding_date: '', estimated_wedding_month:'',
     venue: '', location: 'Surabaya', guest_count: '',
@@ -76,7 +79,7 @@ export default function AdminDashboard() {
   const [leadForm, setLeadForm] = useState({
     contact_name:'', bride_name:'', groom_name:'', phone:'', email:'',
     event_date:'', estimated_event_month:'', location:'Surabaya', source:'manual', source_detail:'',
-    interested_package:'', estimated_budget:'', owner_admin:'', notes:'',
+    interested_package:'', package_id:'', promotion_id:'', estimated_budget:'', owner_admin:'', notes:'',
   })
   const [leadErr, setLeadErr] = useState('')
   const [savingLead, setSavingLead] = useState(false)
@@ -94,6 +97,20 @@ export default function AdminDashboard() {
     if (isSupeadmin) fetchAdmins()
     return () => document.body.classList.remove('admin-shell')
   }, [])
+
+  useEffect(() => {
+    if (!['new','leads'].includes(view)) return
+    let active = true
+    Promise.all([
+      supabase.from('service_packages').select('id,name,is_active').eq('is_active',true).order('sort_order'),
+      supabase.from('promotions').select('id,name,package_id').eq('is_active',true),
+    ]).then(([packages, promotions]) => {
+      if (!active) return
+      if (!packages.error) setOfferPackages(packages.data || [])
+      if (!promotions.error) setOfferPromotions(promotions.data || [])
+    })
+    return () => { active = false }
+  }, [view])
 
   async function fetchProjects() {
     setLoading(true)
@@ -168,6 +185,8 @@ export default function AdminDashboard() {
       source: leadForm.source,
       source_detail: leadForm.source_detail.trim() || null,
       interested_package: leadForm.interested_package.trim() || null,
+      package_id: leadForm.package_id || null,
+      promotion_id: leadForm.promotion_id || null,
       estimated_budget: parseInt(String(leadForm.estimated_budget).replace(/\D/g,'')) || 0,
       owner_admin: leadForm.owner_admin || profile?.id,
       notes: leadForm.notes.trim() || null,
@@ -177,7 +196,7 @@ export default function AdminDashboard() {
     } else {
       setLeadForm({ contact_name:'',bride_name:'',groom_name:'',phone:'',email:'',
         event_date:'',estimated_event_month:'',location:'Surabaya',source:'manual',source_detail:'',
-        interested_package:'',estimated_budget:'',owner_admin:'',notes:'' })
+        interested_package:'',package_id:'',promotion_id:'',estimated_budget:'',owner_admin:'',notes:'' })
       await fetchLeads()
     }
     setSavingLead(false)
@@ -543,6 +562,7 @@ export default function AdminDashboard() {
             { id: 'projects', label: '💍 Semua project' },
             { id: 'leads',    label: '◎ Calon client' },
             ...(isSupeadmin ? [{ id:'lead-form', label:'✎ Form pendaftaran' }] : []),
+            ...(isSupeadmin ? [{ id:'offers', label:'◇ Paket & promo' }] : []),
             { id: 'calendar', label: '▦ Kalender' },
             { id: 'new',      label: '+ Buat project baru' },
             ...(isSupeadmin ? [{ id: 'admins', label: '👥 Kelola admin' }] : []),
@@ -582,6 +602,12 @@ export default function AdminDashboard() {
         {view === 'lead-form' && isSupeadmin && (
           <Suspense fallback={<div style={{padding:40,textAlign:'center',color:MUTED}}>Memuat pengaturan formulir…</div>}>
             <LeadFormSettings />
+          </Suspense>
+        )}
+
+        {view === 'offers' && isSupeadmin && (
+          <Suspense fallback={<div style={{padding:40,textAlign:'center',color:MUTED}}>Memuat paket & promo…</div>}>
+            <OfferCatalog />
           </Suspense>
         )}
 
@@ -932,7 +958,6 @@ export default function AdminDashboard() {
                   ['groom_name','Nama pengantin pria','text','opsional'],
                   ['location','Kota','text','mis. Surabaya'],
                   ['estimated_budget','Perkiraan budget','text','mis. 150000000'],
-                  ['interested_package','Paket yang diminati','text','opsional'],
                 ].map(([key,label,type,placeholder]) => (
                   <div key={key} style={{ marginBottom:10 }}>
                     <p style={{ fontSize:11,color:MUTED,margin:'0 0 4px' }}>{label}</p>
@@ -940,6 +965,18 @@ export default function AdminDashboard() {
                       onChange={e => setLeadForm(s => ({...s,[key]:e.target.value}))} style={inp()} />
                   </div>
                 ))}
+                <div style={{marginBottom:10}}><p style={{fontSize:11,color:MUTED,margin:'0 0 4px'}}>Paket yang diminati</p>
+                  <select value={leadForm.package_id} onChange={e => {
+                    const pkg = offerPackages.find(item => item.id === e.target.value)
+                    setLeadForm(s=>({...s,package_id:pkg?.id || '',interested_package:pkg?.name || '',promotion_id:''}))
+                  }} style={inp({appearance:'none'})}><option value="">Belum memilih</option>
+                    {offerPackages.map(pkg=><option key={pkg.id} value={pkg.id}>{pkg.name}</option>)}
+                  </select></div>
+                {leadForm.package_id && <div style={{marginBottom:10}}><p style={{fontSize:11,color:MUTED,margin:'0 0 4px'}}>Promo (opsional)</p>
+                  <select value={leadForm.promotion_id} onChange={e=>setLeadForm(s=>({...s,promotion_id:e.target.value}))} style={inp({appearance:'none'})}>
+                    <option value="">Tanpa promo</option>
+                    {offerPromotions.filter(p=>!p.package_id || p.package_id === leadForm.package_id).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select></div>}
                 <div style={{marginBottom:10}}><p style={{fontSize:11,color:MUTED,margin:'0 0 4px'}}>Tanggal pasti (boleh kosong)</p>
                   <input type="date" value={leadForm.event_date} onChange={e=>setLeadForm(s=>({...s,event_date:e.target.value,estimated_event_month:''}))} style={inp()}/></div>
                 {!leadForm.event_date && <div style={{marginBottom:10}}><p style={{fontSize:11,color:MUTED,margin:'0 0 4px'}}>Atau perkiraan bulan dan tahun</p>
@@ -1124,10 +1161,8 @@ export default function AdminDashboard() {
                   <select value={form.package_name}
                     onChange={e => setForm(p => ({ ...p, package_name: e.target.value }))}
                     style={inp({ appearance: 'none' })}>
-                    <option>Full Service Premium</option>
-                    <option>Full Service Standard</option>
-                    <option>One Day Coordinator</option>
-                    <option>Essential</option>
+                    {form.package_name && !offerPackages.some(p=>p.name === form.package_name) && <option value={form.package_name}>{form.package_name}</option>}
+                    {offerPackages.map(pkg=><option key={pkg.id} value={pkg.name}>{pkg.name}</option>)}
                   </select>
                 </div>
               </div>
