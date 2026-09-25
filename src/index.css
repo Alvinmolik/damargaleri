@@ -637,3 +637,14 @@ body.public-lead-shell #root { max-width:none; }
 .offer-card button { margin-top:16px; padding:10px 16px; border:0; border-radius:8px; background:#1b4332; color:#fff; cursor:pointer; }
 .offer-card button:disabled { opacity:.55; cursor:wait; }
 @media(max-width:650px) { .offer-fields { grid-template-columns:1fr; } .offer-card-heading { flex-direction:column; } }
+.admin-list-filters { display:flex; align-items:flex-end; flex-wrap:wrap; gap:10px; background:#fff; padding:14px; border:1px solid #e2ede6; border-radius:12px; margin:12px 0; }
+.admin-list-filters label { display:grid; gap:4px; color:#315743; font-size:12px; }
+.admin-list-filters input,.admin-list-filters select { min-width:160px; padding:9px 11px; border:1px solid #d7e7dc; border-radius:8px; background:white; font:inherit; }
+.admin-list-filters input[aria-label="Cari project"] { flex:1; min-width:200px; }
+.admin-list-filters button,.pm-edit-form button { padding:9px 12px; border:1px solid #cfe4d5; background:#f0faf3; color:#1b4332; border-radius:8px; cursor:pointer; }
+.admin-list-filters span { font-size:12px; color:#63766a; padding-bottom:8px; }
+.pm-edit-form { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; padding:16px; margin-top:14px; background:#f7faf8; border-radius:10px; }
+.pm-edit-form strong { width:100%; }
+.pm-edit-form label { display:grid; gap:4px; font-size:12px; color:#315743; }
+.pm-edit-form input { padding:9px; border:1px solid #d7e7dc; border-radius:8px; }
+@media(max-width:650px) { .admin-list-filters { flex-direction:column; align-items:stretch; } .admin-list-filters input,.admin-list-filters select { width:100%; } }
