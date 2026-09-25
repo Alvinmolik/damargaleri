@@ -30,7 +30,7 @@ export default function Router() {
   if (isAdminRoute) {
     if (!user) return <LoginPage mode="admin" />
     if (isPasswordSetup) return <SetPasswordPage />
-    const hasAdminAccess = profile?.role === 'admin' || profile?.role === 'superadmin'
+    const hasAdminAccess = profile?.is_active !== false && (profile?.role === 'admin' || profile?.role === 'superadmin')
     if (!hasAdminAccess) return <div style={err}>Akses admin ditolak.</div>
     return <AdminDashboard />
   }
