@@ -36,6 +36,9 @@ function Turnstile({ onToken, resetKey }) {
 
 export default function PublicLeadForm() {
   const [settings, setSettings] = useState(null)
+  const [packages, setPackages] = useState([])
+  const [promotions, setPromotions] = useState([])
+  const [catalogError, setCatalogError] = useState('')
   const [loading, setLoading] = useState(true)
   const [answers, setAnswers] = useState({})
   const [dateMode, setDateMode] = useState('unknown')
@@ -49,6 +52,19 @@ export default function PublicLeadForm() {
   useEffect(() => {
     document.body.classList.add('public-lead-shell')
     return () => document.body.classList.remove('public-lead-shell')
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    Promise.all([
+      supabase.from('service_packages').select('id, name, description, base_price').eq('is_active',true).order('sort_order'),
+      supabase.from('promotions').select('id, name, package_id, discount_type, discount_value').eq('is_active',true).order('name'),
+    ]).then(([p,promo]) => {
+      if (!active) return
+      if (p.error || promo.error) setCatalogError('Pilihan paket dan promo belum bisa dimuat. Silakan coba lagi nanti.')
+      else { setPackages(p.data || []); setPromotions(promo.data || []) }
+    })
+    return () => { active = false }
   }, [])
 
   useEffect(() => {
@@ -102,6 +118,27 @@ export default function PublicLeadForm() {
         <form onSubmit={submit}>
           {settings.fields.map(field => {
             if (!field.key || field.enabled === false || !allowedTypes.has(field.type)) return null
+            if (field.key === 'interested_package') {
+              const available = promotions.filter(promo => !promo.package_id || promo.package_id === answers.package_id)
+              return <div className="public-lead-offer" key={field.key}>
+                <label>{field.label}{field.required && ' *'}
+                  <select required={field.required} value={answers.package_id || ''} onChange={e => {
+                    const selected = packages.find(pkg => pkg.id === e.target.value)
+                    setAnswers(current => ({...current,package_id:selected?.id || '', interested_package:selected?.name || '', promotion_id:''}))
+                  }}>
+                    <option value="">Belum memilih paket</option>
+                    {packages.map(pkg => <option key={pkg.id} value={pkg.id}>{pkg.name}{pkg.base_price != null ? ` · harga dasar Rp ${Number(pkg.base_price).toLocaleString('id-ID')}` : ''}</option>)}
+                  </select>
+                </label>
+                {answers.package_id && available.length > 0 && <label>Promo yang diminati (opsional)
+                  <select value={answers.promotion_id || ''} onChange={e => setAnswers(current => ({...current,promotion_id:e.target.value}))}>
+                    <option value="">Tanpa promo</option>
+                    {available.map(promo => <option key={promo.id} value={promo.id}>{promo.name} · {promo.discount_type === 'percent' ? `${promo.discount_value}%` : `Rp ${Number(promo.discount_value).toLocaleString('id-ID')}`}</option>)}
+                  </select>
+                </label>}
+                {catalogError && <small role="status">{catalogError}</small>}
+              </div>
+            }
             if (field.key === 'event_date' && field.type === 'date') return <fieldset className="public-lead-choices" key={field.key}>
               <legend>Rencana waktu acara{field.required && ' *'}</legend>
               <select value={dateMode} onChange={e => {
