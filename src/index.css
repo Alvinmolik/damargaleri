@@ -147,6 +147,7 @@ body { overscroll-behavior: none; }
 .lead-detail-followup > div { display:flex; gap:8px; }
 .lead-detail input,.lead-detail select,.lead-detail textarea { min-width:0; border:1px solid #D8E7DC; border-radius:7px; padding:9px; color:#232723; background:#fff; font-size:12px; }
 .lead-detail-followup input { flex:1; }
+.lead-detail-followup .lead-detail-finish { margin-top:10px; background:#e5f2e9!important; color:#1b4332!important; }
 .lead-detail button:not(.lead-detail-header button) { border:0; border-radius:7px; padding:9px 12px; background:#1B4332; color:#fff; cursor:pointer; font-size:11px; font-weight:650; }
 .lead-detail button:disabled { opacity:.45; cursor:not-allowed; }
 .lead-detail h3 { margin:20px 0 8px; font:600 16px 'Lora',serif; color:#1B4332; }
@@ -360,6 +361,18 @@ body { overscroll-behavior: none; }
   gap: 16px;
   margin-bottom: 16px;
 }
+.lead-queue-summary { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:8px; }
+.lead-queue-summary button { border:1px solid #e2ede6; background:#f8fbf8; color:#1b4332; border-radius:9px; padding:9px 12px; cursor:pointer; }
+.lead-queue-summary strong { font-size:17px; margin-right:4px; }
+.lead-queue-row { display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:12px; padding:11px 0; border-top:1px solid #edf2ee; }
+.lead-queue-row strong,.lead-queue-row span { display:block; }
+.lead-queue-row strong { color:#1b4332; font-size:12px; }
+.lead-queue-row span,.lead-queue-row small { color:#6c7570; font-size:11px; }
+.lead-queue-row button { border:0; background:#1b4332; color:white; padding:8px 11px; border-radius:8px; cursor:pointer; font-weight:600; }
+.lead-queue-filters { display:flex; flex-wrap:wrap; gap:7px; margin-bottom:12px; }
+.lead-queue-filters button { background:white; border:1px solid #e2ede6; border-radius:8px; padding:8px 10px; color:#315743; cursor:pointer; }
+.lead-queue-filters button[aria-pressed=true] { background:#1b4332; border-color:#1b4332; color:white; }
+@media(max-width:700px) { .lead-queue-row { grid-template-columns:minmax(0,1fr) auto; } .lead-queue-row small { grid-column:1 / -1; grid-row:2; } }
 
 .overview-panel {
   border: 1px solid #E2EDE6;

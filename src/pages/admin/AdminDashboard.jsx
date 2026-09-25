@@ -84,6 +84,7 @@ export default function AdminDashboard() {
   const [convertingLead, setConvertingLead] = useState(null)
   const [convertError, setConvertError] = useState('')
   const [selectedLead, setSelectedLead] = useState(null)
+  const [leadQueueFilter, setLeadQueueFilter] = useState('all')
 
   useEffect(() => {
     document.body.classList.add('admin-shell')
@@ -481,6 +482,14 @@ export default function AdminDashboard() {
   const upcomingEvents = overviewEvents
     .filter(e => new Date(e.starts_at) >= startOfToday)
     .slice(0, 6)
+  const openLeads = leads.filter(lead => !['booked','lost'].includes(lead.status))
+  const dueFollowUps = openLeads.filter(lead => lead.next_follow_up_at && new Date(lead.next_follow_up_at) <= today)
+    .sort((a,b) => new Date(a.next_follow_up_at) - new Date(b.next_follow_up_at))
+  const unscheduledNewLeads = openLeads.filter(lead => lead.status === 'new' && !lead.next_follow_up_at)
+    .sort((a,b) => new Date(a.created_at) - new Date(b.created_at))
+  const filteredLeads = leadQueueFilter === 'due' ? dueFollowUps
+    : leadQueueFilter === 'new' ? unscheduledNewLeads : leads
+  const openLeadQueue = filter => { setLeadQueueFilter(filter); setView('leads') }
   const formatDate = (value, withTime=false) => value
     ? new Date(value).toLocaleDateString('id-ID', {
         day:'numeric', month:'short', year:'numeric',
@@ -649,6 +658,25 @@ export default function AdminDashboard() {
                     <small className={overdue ? 'late-text' : ''}>{overdue ? 'Terlambat · ' : ''}{formatDate(task.due_date)}</small>
                   </div>
                 })}
+              </section>
+              <section className="overview-panel" style={{gridColumn:'1 / -1'}}>
+                <div className="overview-panel-title">
+                  <div><span>CRM · PERLU TINDAKAN</span><h2>Follow-up calon client</h2></div>
+                  <button onClick={()=>openLeadQueue('due')}>Lihat semua</button>
+                </div>
+                <div className="lead-queue-summary">
+                  <button onClick={()=>openLeadQueue('due')}><strong>{dueFollowUps.length}</strong> jatuh tempo</button>
+                  <button onClick={()=>openLeadQueue('new')}><strong>{unscheduledNewLeads.length}</strong> lead baru tanpa jadwal</button>
+                </div>
+                {leadsLoading ? <p className="overview-empty">Memuat lead…</p>
+                  : dueFollowUps.length + unscheduledNewLeads.length === 0
+                    ? <p className="overview-empty">Tidak ada follow-up jatuh tempo atau lead baru tanpa jadwal.</p>
+                    : [...dueFollowUps, ...unscheduledNewLeads].slice(0, 8).map(lead => <div className="lead-queue-row" key={lead.id}>
+                      <div><strong>{lead.contact_name}</strong><span>{lead.profiles?.full_name || 'Belum ditugaskan'} · {lead.source_detail || lead.source || 'Sumber belum diisi'}</span></div>
+                      <small className={lead.next_follow_up_at ? 'late-text' : ''}>{lead.next_follow_up_at
+                        ? `Jatuh tempo ${formatDate(lead.next_follow_up_at,true)}` : 'Belum dijadwalkan'}</small>
+                      <button onClick={()=>setSelectedLead(lead)}>Tindak lanjuti</button>
+                    </div>)}
               </section>
             </div>
 
@@ -937,10 +965,15 @@ export default function AdminDashboard() {
               <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:12 }}>
                 {[['Total lead',leads.length],['Perlu dihubungi',leads.filter(l=>l.status==='new').length],['Sudah booking',leads.filter(l=>l.status==='booked').length]].map(([label,val])=><div key={label} style={{background:WHITE,border:`1px solid ${BORDER}`,borderRadius:12,padding:'13px 15px'}}><p style={{fontSize:22,fontFamily:'Lora, serif',fontWeight:700,color:G900,margin:0}}>{val}</p><p style={{fontSize:10,color:MUTED,margin:'2px 0 0'}}>{label}</p></div>)}
               </div>
+              <div className="lead-queue-filters" role="group" aria-label="Filter calon client">
+                {[['all','Semua',leads.length],['due','Jatuh tempo',dueFollowUps.length],['new','Baru tanpa jadwal',unscheduledNewLeads.length]].map(([key,label,count]) =>
+                  <button key={key} type="button" aria-pressed={leadQueueFilter===key}
+                    onClick={()=>setLeadQueueFilter(key)}>{label} ({count})</button>)}
+              </div>
               {leadsLoading ? <div style={{textAlign:'center',padding:32,color:MUTED}}>Memuat calon client…</div> :
-              leads.length === 0 ? <div style={{background:WHITE,border:`1px solid ${BORDER}`,borderRadius:14,padding:32,textAlign:'center',color:MUTED,fontSize:12}}>Belum ada calon client.</div> :
+              filteredLeads.length === 0 ? <div style={{background:WHITE,border:`1px solid ${BORDER}`,borderRadius:14,padding:32,textAlign:'center',color:MUTED,fontSize:12}}>{leads.length ? 'Tidak ada lead pada filter ini.' : 'Belum ada calon client.'}</div> :
               <div style={{display:'flex',flexDirection:'column',gap:10}}>
-                {leads.map(l => <div key={l.id} style={{background:WHITE,border:`1px solid ${BORDER}`,borderRadius:13,padding:'14px 16px'}}>
+                {filteredLeads.map(l => <div key={l.id} style={{background:WHITE,border:`1px solid ${BORDER}`,borderRadius:13,padding:'14px 16px'}}>
                   <div style={{display:'flex',justifyContent:'space-between',gap:12}}>
                     <div><p style={{fontSize:14,fontWeight:600,margin:'0 0 3px',color:DARK}}>{l.contact_name}</p><p style={{fontSize:11,color:MUTED,margin:0}}>{[l.bride_name&&l.groom_name?`${l.bride_name} & ${l.groom_name}`:l.bride_name||l.groom_name,l.phone,l.location].filter(Boolean).join(' · ')}</p></div>
                     <select value={l.status} onChange={e=>updateLeadStatus(l,e.target.value)} style={inp({width:'auto',minWidth:118,padding:'6px 8px',fontSize:11,appearance:'none'})}>
@@ -948,11 +981,12 @@ export default function AdminDashboard() {
                     </select>
                   </div>
                   <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:10}}>
-                    <span style={{fontSize:10,padding:'3px 7px',borderRadius:20,background:G50,color:G700}}>{l.source || 'manual'}</span>
+                    <span style={{fontSize:10,padding:'3px 7px',borderRadius:20,background:G50,color:G700}}>Masuk via {l.source || 'manual'}</span>
+                    {l.source_detail&&<span style={{fontSize:10,padding:'3px 7px',borderRadius:20,background:G50,color:G700}}>Tahu dari {l.source_detail}</span>}
                     {l.event_date&&<span style={{fontSize:10,padding:'3px 7px',borderRadius:20,background:'#F5F5F5',color:MID}}>Acara {new Date(l.event_date).toLocaleDateString('id-ID')}</span>}
                     {!l.event_date&&l.estimated_event_month&&<span style={{fontSize:10,padding:'3px 7px',borderRadius:20,background:'#F5F5F5',color:MID}}>Perkiraan {new Date(`${l.estimated_event_month}-01T12:00:00`).toLocaleDateString('id-ID',{month:'long',year:'numeric'})}</span>}
                     <span style={{fontSize:10,padding:'3px 7px',borderRadius:20,background:'#F5F5F5',color:MID}}>PM: {l.profiles?.full_name||'Belum ditugaskan'}</span>
-                    {l.next_follow_up_at && <span style={{fontSize:10,padding:'3px 7px',borderRadius:20,background:new Date(l.next_follow_up_at)<new Date()?'#FFF1EE':AMBERBG,color:new Date(l.next_follow_up_at)<new Date()?RED:AMBER}}>Follow-up: {new Date(l.next_follow_up_at).toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'})}</span>}
+                    {l.next_follow_up_at && <span style={{fontSize:10,padding:'3px 7px',borderRadius:20,background:new Date(l.next_follow_up_at)<=today?'#FFF1EE':AMBERBG,color:new Date(l.next_follow_up_at)<=today?RED:AMBER}}>Follow-up: {new Date(l.next_follow_up_at).toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'})}</span>}
                   </div>
                   <div style={{display:'flex',justifyContent:'flex-end',gap:7,marginTop:10}}>
                     <button onClick={() => setSelectedLead(l)} style={{fontSize:11,padding:'6px 10px',border:`1px solid ${G100}`,borderRadius:7,background:WHITE,color:G700,fontWeight:600,cursor:'pointer'}}>Detail & follow-up</button>
