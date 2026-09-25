@@ -71,11 +71,11 @@ Deno.serve(async (req: Request) => {
     const callerId = userData.user.id;
     const { data: callerProfile, error: profileError } = await admin
       .from("profiles")
-      .select("id, role")
+      .select("id, role, is_active")
       .eq("id", callerId)
       .single();
 
-    if (profileError || !callerProfile || !["superadmin", "admin"].includes(callerProfile.role)) {
+    if (profileError || !callerProfile?.is_active || !["superadmin", "admin"].includes(callerProfile.role)) {
       return json(origin, { error: "Akses ditolak" }, 403);
     }
 
@@ -83,6 +83,33 @@ Deno.serve(async (req: Request) => {
     const action = String(body.action ?? "");
     const email = cleanEmail(body.email);
     const fullName = String(body.full_name ?? body.client_name ?? "").trim();
+
+    if (["update_pm", "deactivate_pm", "reactivate_pm"].includes(action)) {
+      if (callerProfile.role !== "superadmin") return json(origin, { error:"Hanya superadmin yang dapat mengelola PM" }, 403);
+      const pmId = String(body.pm_id ?? "");
+      if (!/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(pmId) || pmId === callerId) return json(origin, { error:"Akun PM tidak valid" }, 400);
+      const { data: pm, error: pmError } = await admin.from("profiles")
+        .select("id,role,is_active").eq("id",pmId).single();
+      if (pmError || pm?.role !== "admin") return json(origin, { error:"Akun PM tidak ditemukan" }, 404);
+
+      if (action === "update_pm") {
+        const name = String(body.full_name ?? "").trim();
+        const wa = String(body.wa_number ?? "").trim();
+        if (name.length < 2 || name.length > 100 || wa.length > 25) return json(origin, { error:"Nama atau nomor WA tidak valid" }, 400);
+        const { error: updateError } = await admin.from("profiles").update({full_name:name,full_name_display:name,wa_number:wa || null}).eq("id",pmId);
+        if (updateError) throw updateError;
+      } else if (action === "deactivate_pm") {
+        const { count, error: countError } = await admin.from("projects").select("id",{head:true,count:"exact"}).eq("assigned_admin",pmId);
+        if (countError) throw countError;
+        if (count) return json(origin, { error:`PM masih menangani ${count} project. Pindahkan project ke PM lain sebelum menonaktifkan.` }, 409);
+        const { error: updateError } = await admin.from("profiles").update({is_active:false}).eq("id",pmId);
+        if (updateError) throw updateError;
+      } else {
+        const { error: updateError } = await admin.from("profiles").update({is_active:true}).eq("id",pmId);
+        if (updateError) throw updateError;
+      }
+      return json(origin, {ok:true});
+    }
 
     if (action === "delete_project") {
       if (callerProfile.role !== "superadmin") {
