@@ -63,6 +63,13 @@ Deno.serve(async (request: Request) => {
     }
     const answers: Record<string, string> = {}
     const selections: Record<string, string[]> = {}
+    const dateField = (settings.fields as FormField[]).find(field => field.key === 'event_date' && field.enabled !== false)
+    const rawMonth = inputs.estimated_event_month
+    if (rawMonth !== undefined && typeof rawMonth !== 'string') return reply(origin, { error: 'Bulan acara tidak valid.' }, 400)
+    const estimatedMonth = dateField ? String(rawMonth || '').trim() : ''
+    if (estimatedMonth && !/^(20[0-9]{2}|21[0-9]{2})-(0[1-9]|1[0-2])$/.test(estimatedMonth)) {
+      return reply(origin, { error: 'Bulan acara tidak valid.' }, 400)
+    }
     for (const field of settings.fields as FormField[]) {
       if (field.enabled === false) continue
       if (!field.key || (!standardKeys.has(field.key) && !/^custom_[a-z0-9_]{1,40}$/.test(field.key))) {
@@ -83,7 +90,7 @@ Deno.serve(async (request: Request) => {
       }
       if (value !== undefined && typeof value !== 'string') return reply(origin, { error: 'Isian tidak valid.' }, 400)
       const cleaned = String(value || '').trim()
-      if (field.required && !cleaned) return reply(origin, { error: `Lengkapi kolom ${field.key}.` }, 400)
+      if (field.required && !cleaned && !(field.key === 'event_date' && estimatedMonth)) return reply(origin, { error: `Lengkapi kolom ${field.key}.` }, 400)
       if (cleaned.length > 500) return reply(origin, { error: 'Isian terlalu panjang.' }, 400)
       if (field.type === 'select' && cleaned && !field.options?.includes(cleaned)) {
         return reply(origin, { error: 'Pilihan tidak valid.' }, 400)
@@ -105,6 +112,7 @@ Deno.serve(async (request: Request) => {
       || new Date(`${answers.event_date}T00:00:00Z`).toISOString().slice(0, 10) !== answers.event_date)) {
       return reply(origin, { error: 'Tanggal acara tidak valid.' }, 400)
     }
+    if (answers.event_date && estimatedMonth) return reply(origin, { error: 'Pilih tanggal atau perkiraan bulan.' }, 400)
     const budget = answers.estimated_budget ? Number(answers.estimated_budget) : 0
     if (!Number.isSafeInteger(budget) || budget < 0) return reply(origin, { error: 'Budget tidak valid.' }, 400)
 
@@ -118,6 +126,7 @@ Deno.serve(async (request: Request) => {
       contact_name:answers.contact_name, phone:answers.phone || null,
       email:answers.email?.toLowerCase() || null, bride_name:answers.bride_name || null,
       groom_name:answers.groom_name || null, event_date:answers.event_date || null,
+      estimated_event_month:estimatedMonth || null,
       location:answers.location || null, estimated_budget:budget,
       interested_package:answers.interested_package || null,
       source:'website', source_detail:answers.source_detail || null,

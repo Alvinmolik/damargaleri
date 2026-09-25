@@ -89,8 +89,9 @@ export default function LeadDetail({ lead, admins, isSuperadmin, onClose, onChan
         <div className="lead-detail-facts">
           <div><span>WhatsApp</span><strong>{lead.phone || '—'}</strong></div>
           <div><span>Email</span><strong>{lead.email || '—'}</strong></div>
-          <div><span>Sumber</span><strong>{[lead.source, lead.source_detail].filter(Boolean).join(' · ') || '—'}</strong></div>
-          <div><span>Acara</span><strong>{lead.event_date || '—'}</strong></div>
+          <div><span>Masuk melalui</span><strong>{lead.source || '—'}</strong></div>
+          <div><span>Tahu Damargaleri dari</span><strong>{lead.source_detail || '—'}</strong></div>
+          <div><span>Acara</span><strong>{lead.event_date || (lead.estimated_event_month ? `Perkiraan ${new Date(`${lead.estimated_event_month}-01T12:00:00`).toLocaleDateString('id-ID',{month:'long',year:'numeric'})}` : 'Belum diketahui')}</strong></div>
           <div><span>Paket</span><strong>{lead.interested_package || '—'}</strong></div>
           <div><span>Follow-up berikutnya</span><strong>{displayDate(lead.next_follow_up_at)}</strong></div>
         </div>

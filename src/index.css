@@ -160,6 +160,15 @@ body { overscroll-behavior: none; }
 .lead-detail-activity textarea { resize:vertical; }
 .lead-detail-activity button { justify-self:start; }
 .lead-detail-error { color:#C0392B; font-size:11px; }
+.lead-convert-form { padding:20px 24px 32px; display:grid; gap:12px; }
+.lead-convert-form > p { font-size:12px; line-height:1.6; color:#63766a; margin:0 0 4px; }
+.lead-convert-form label { display:grid; gap:6px; font-size:12px; font-weight:600; color:#315743; }
+.lead-convert-form input,.lead-convert-form select { width:100%; padding:10px; border:1px solid #d7e7dc; border-radius:8px; color:#1c1c1e; background:#fff; font:inherit; }
+.lead-convert-form small { color:#63766a; }
+.lead-convert-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:12px; }
+.lead-convert-actions button { padding:10px 14px; border:1px solid #d7e7dc; border-radius:8px; background:#fff; color:#1b4332; font-weight:650; cursor:pointer; }
+.lead-convert-actions button[type=submit] { background:#1b4332; color:#fff; }
+.lead-convert-actions button:disabled { opacity:.55; cursor:not-allowed; }
 @media(max-width:520px) { .lead-detail-body,.lead-detail-header { padding-left:16px; padding-right:16px; } .lead-detail-followup > div { flex-direction:column; } }
 
 /* ── Admin Project 360 ── */

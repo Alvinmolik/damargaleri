@@ -194,7 +194,7 @@ export default function App({slug,readOnly=false}){
   const pkg=project.packages;
   const coverImg=project.cover_image_url||"/cover-default.jpg";
   const coupleNames=`${project.bride_name} & ${project.groom_name}`;
-  const weddingDate=project.wedding_date?new Date(project.wedding_date).toLocaleDateString("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"}):"Tanggal belum diset";
+  const weddingDate=project.wedding_date?new Date(project.wedding_date).toLocaleDateString("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"}):project.estimated_wedding_month?`Perkiraan ${new Date(`${project.estimated_wedding_month}-01T12:00:00`).toLocaleDateString("id-ID",{month:"long",year:"numeric"})}`:"Tanggal belum diset";
   const pmWA=project.profiles?.wa_number||pkg?.wa_number||"6288213767999";
 
   // Merge server state with optimistic local state
@@ -295,7 +295,10 @@ export default function App({slug,readOnly=false}){
     setConfirmDelete(null);
   }
   async function handleSaveDetail(){
-    await updateProject({...detailForm,budget_total:parseInt(String(detailForm.budget_total).replace(/\D/g,""))||0});
+    const result=await updateProject({...detailForm,wedding_date:detailForm.wedding_date||null,
+      estimated_wedding_month:detailForm.wedding_date?null:detailForm.estimated_wedding_month||null,
+      budget_total:parseInt(String(detailForm.budget_total).replace(/\D/g,""))||0});
+    if(result?.error){window.alert('Gagal menyimpan: '+result.error.message);return;}
     setEditingDetail(false);
   }
   async function handleCover(e){
@@ -361,14 +364,14 @@ export default function App({slug,readOnly=false}){
                   <h1 style={{fontFamily:"Lora,serif",fontSize:30,fontWeight:600,fontStyle:"italic",color:"#fff",margin:"0 0 3px",lineHeight:1.2}}>{coupleNames}</h1>
                   <p style={{fontSize:12,color:"rgba(255,255,255,.6)",margin:"0 0 14px"}}>📅 {weddingDate}{project.location?` · ${project.location}`:""}</p>
                   {/* Countdown glass card */}
-                  <div style={{background:"rgba(255,255,255,.12)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",borderRadius:16,padding:"12px 16px",border:"1px solid rgba(255,255,255,.15)",display:"flex",justifyContent:"space-around"}}>
+                  {project.wedding_date&&<div style={{background:"rgba(255,255,255,.12)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",borderRadius:16,padding:"12px 16px",border:"1px solid rgba(255,255,255,.15)",display:"flex",justifyContent:"space-around"}}>
                     {[["Hari",countdown.d],["Jam",countdown.h],["Menit",countdown.m],["Detik",countdown.s]].map(([l,v])=>(
                       <div key={l} style={{textAlign:"center"}}>
                         <p style={{fontFamily:"Lora,serif",fontSize:26,fontWeight:700,color:"#fff",margin:"0 0 1px",lineHeight:1}}>{String(v).padStart(2,"0")}</p>
                         <p style={{fontSize:9,color:"rgba(255,255,255,.5)",margin:0,letterSpacing:".08em",textTransform:"uppercase"}}>{l}</p>
                       </div>
                     ))}
-                  </div>
+                  </div>}
                 </div>
               )}
             </div>
@@ -381,7 +384,7 @@ export default function App({slug,readOnly=false}){
                 <div style={{flex:1}}>
                   <p style={{fontSize:13,color:MUTED,margin:"0 0 3px"}}>Tugas Terselesaikan</p>
                   <p style={{fontSize:22,fontWeight:700,color:G900,margin:"0 0 8px",fontFamily:"Lora,serif"}}>{doneCount} <span style={{fontSize:14,color:MUTED,fontWeight:400}}>/ {allTasks.length}</span></p>
-                  <span style={{...chip(G50,G700),border:`1px solid ${G100}`}}>{countdown.d} hari lagi</span>
+                  <span style={{...chip(G50,G700),border:`1px solid ${G100}`}}>{project.wedding_date?`${countdown.d} hari lagi`:weddingDate}</span>
                 </div>
               </div>
 
@@ -680,7 +683,7 @@ export default function App({slug,readOnly=false}){
               <div style={{...card(),marginBottom:12}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
                   <SLabel t="Info Pernikahan"/>
-                  <button onClick={editingDetail?handleSaveDetail:()=>{setDetailForm({wedding_date:project.wedding_date||"",venue:project.venue||"",venue_address:project.venue_address||"",guest_count:project.guest_count||"",budget_total:project.budget_total||"",location:project.location||""});setEditingDetail(true);}}
+                  <button onClick={editingDetail?handleSaveDetail:()=>{setDetailForm({wedding_date:project.wedding_date||"",estimated_wedding_month:project.estimated_wedding_month||"",venue:project.venue||"",venue_address:project.venue_address||"",guest_count:project.guest_count||"",budget_total:project.budget_total||"",location:project.location||""});setEditingDetail(true);}}
                     style={{fontSize:11,padding:"5px 14px",borderRadius:20,background:editingDetail?G900:G50,color:editingDetail?"#fff":G700,border:`1px solid ${editingDetail?G900:G100}`,cursor:"pointer",marginBottom:10,fontWeight:600}}>
                     {editingDetail?"✓ Simpan":"Edit"}
                   </button>
@@ -691,6 +694,8 @@ export default function App({slug,readOnly=false}){
                       <div key={f.key}><p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>{f.label}</p>
                         <input type={f.type||"text"} value={detailForm[f.key]||""} onChange={e=>setDetailForm(p=>({...p,[f.key]:e.target.value}))} style={inp()}/></div>
                     ))}
+                    {!detailForm.wedding_date&&<div><p style={{fontSize:11,color:MUTED,margin:"0 0 4px"}}>Atau perkiraan bulan dan tahun</p>
+                      <input type="month" value={detailForm.estimated_wedding_month||""} onChange={e=>setDetailForm(p=>({...p,estimated_wedding_month:e.target.value}))} style={inp()}/></div>}
                     <button onClick={()=>setEditingDetail(false)} style={{padding:"9px",fontSize:12,background:"none",border:`1.5px solid ${BORDER2}`,borderRadius:10,cursor:"pointer",color:MUTED}}>Batal</button>
                   </div>
                 ):(
