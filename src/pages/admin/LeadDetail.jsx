@@ -79,6 +79,23 @@ export default function LeadDetail({ lead, admins, isSuperadmin, onClose, onChan
     setBusy(false)
   }
 
+  async function finishFollowUp() {
+    setBusy(true); setError('')
+    const { data, error: updateError } = await supabase.from('leads')
+      .update({ next_follow_up_at:null, ...(lead.status === 'new' ? { status:'contacted' } : {}) })
+      .eq('id', lead.id).select('id, next_follow_up_at, status').single()
+    if (updateError || !data) setError(`Gagal menyelesaikan follow-up: ${updateError?.message || 'Akses ditolak.'}`)
+    else {
+      onChanged({ ...lead, next_follow_up_at:null, status:data.status })
+      const { data: log, error: logError } = await supabase.from('lead_activities')
+        .insert({ lead_id:lead.id, activity_type:'follow_up', description:'Follow-up ditandai selesai' })
+        .select('id, activity_type, description, happened_at').single()
+      if (logError) setError(`Jadwal sudah dihapus, tetapi riwayat gagal disimpan: ${logError.message}`)
+      else setActivities(previous => [log, ...previous])
+    }
+    setBusy(false)
+  }
+
   return <div className="lead-detail-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}>
     <section className="lead-detail" role="dialog" aria-modal="true" aria-labelledby="lead-detail-title">
       <header className="lead-detail-header">
@@ -112,6 +129,7 @@ export default function LeadDetail({ lead, admins, isSuperadmin, onClose, onChan
         <form className="lead-detail-followup" onSubmit={saveFollowUp}>
           <label htmlFor="lead-next-followup">Jadwalkan follow-up (waktu lokal perangkat)</label>
           <div><input id="lead-next-followup" type="datetime-local" value={followUp} onChange={event => setFollowUp(event.target.value)}/><button disabled={busy || !followUp}>Simpan jadwal</button></div>
+          {lead.next_follow_up_at && <button type="button" className="lead-detail-finish" disabled={busy} onClick={finishFollowUp}>Tandai follow-up selesai</button>}
         </form>
         <h3>Riwayat interaksi</h3>
         {loading ? <p className="lead-detail-empty">Memuat interaksi…</p> : activities.length === 0 ? <p className="lead-detail-empty">Belum ada interaksi tercatat.</p> :
