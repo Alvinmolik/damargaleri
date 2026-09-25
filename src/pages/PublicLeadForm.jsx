@@ -4,6 +4,18 @@ import { supabase } from '../lib/supabase'
 const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY
 const allowedTypes = new Set(['text', 'tel', 'email', 'date', 'number', 'textarea', 'select', 'checkbox'])
 
+function selectedDateLabel(value, monthOnly = false) {
+  if (!value) return ''
+  const parts = value.split('-').map(Number)
+  if (parts.length !== (monthOnly ? 2 : 3) || parts.some(part => !Number.isInteger(part))) return ''
+  const date = new Date(parts[0], parts[1] - 1, monthOnly ? 1 : parts[2])
+  if (date.getFullYear() !== parts[0] || date.getMonth() !== parts[1] - 1 ||
+    !monthOnly && date.getDate() !== parts[2]) return ''
+  return new Intl.DateTimeFormat('id-ID', monthOnly
+    ? { month:'long', year:'numeric' }
+    : { day:'numeric', month:'long', year:'numeric' }).format(date)
+}
+
 function Turnstile({ onToken, resetKey }) {
   const container = useRef(null)
   useEffect(() => {
@@ -139,19 +151,32 @@ export default function PublicLeadForm() {
                 {catalogError && <small role="status">{catalogError}</small>}
               </div>
             }
-            if (field.key === 'event_date' && field.type === 'date') return <fieldset className="public-lead-choices" key={field.key}>
+            if (field.key === 'event_date' && field.type === 'date') return <fieldset className="public-lead-choices public-lead-date" key={field.key}>
               <legend>Rencana waktu acara{field.required && ' *'}</legend>
-              <select value={dateMode} onChange={e => {
-                const mode = e.target.value
-                setDateMode(mode)
-                setAnswers(current => ({...current,event_date:'',estimated_event_month:''}))
-              }}>
-                <option value="unknown">Belum diketahui</option>
-                <option value="month">Perkiraan bulan dan tahun</option>
-                <option value="date">Tanggal sudah pasti</option>
-              </select>
-              {dateMode === 'date' && <input aria-label="Tanggal acara" type="date" required value={answers.event_date || ''} onChange={e => setAnswers(current => ({...current,event_date:e.target.value}))}/>}
-              {dateMode === 'month' && <input aria-label="Perkiraan bulan acara" type="month" required value={answers.estimated_event_month || ''} onChange={e => setAnswers(current => ({...current,estimated_event_month:e.target.value}))}/>}
+              <p className="public-lead-date-hint">Pilih informasi tanggal yang sudah kamu ketahui.</p>
+              <div className="public-lead-date-options">
+                {[
+                  ['unknown','Belum tahu tanggalnya'],
+                  ['month','Tahu bulan & tahun'],
+                  ['date','Tanggal sudah pasti'],
+                ].filter(([mode]) => !field.required || mode !== 'unknown').map(([mode,label]) => <label key={mode} className={`public-lead-date-option${dateMode === mode ? ' is-selected' : ''}`}>
+                  <input type="radio" name="event-date-mode" checked={dateMode === mode} onChange={() => {
+                    setDateMode(mode)
+                    setAnswers(current => ({...current,event_date:'',estimated_event_month:''}))
+                  }}/><span>{label}</span>
+                </label>)}
+              </div>
+              {dateMode === 'date' && <label className="public-lead-date-input">Pilih tanggal acara
+                <input type="date" required value={answers.event_date || ''} onChange={e => setAnswers(current => ({...current,event_date:e.target.value}))}/>
+              </label>}
+              {dateMode === 'month' && <label className="public-lead-date-input">Pilih perkiraan bulan dan tahun
+                <input type="month" required value={answers.estimated_event_month || ''} onChange={e => setAnswers(current => ({...current,estimated_event_month:e.target.value}))}/>
+              </label>}
+              {dateMode !== 'unknown' && <p className={`public-lead-date-summary${(dateMode === 'date' ? answers.event_date : answers.estimated_event_month) ? ' is-filled' : ''}`} role="status">
+                {(dateMode === 'date' ? selectedDateLabel(answers.event_date) : selectedDateLabel(answers.estimated_event_month,true))
+                  ? `✓ ${dateMode === 'date' ? 'Tanggal acara' : 'Perkiraan waktu acara'}: ${dateMode === 'date' ? selectedDateLabel(answers.event_date) : selectedDateLabel(answers.estimated_event_month,true)}`
+                  : 'Belum ada tanggal atau bulan yang dipilih.'}
+              </p>}
             </fieldset>
             if (field.type === 'checkbox') return <fieldset className="public-lead-choices" key={field.key}>
               <legend>{field.label}{field.required && ' *'}</legend>
