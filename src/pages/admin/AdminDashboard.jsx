@@ -87,7 +87,15 @@ export default function AdminDashboard() {
   const [convertingLead, setConvertingLead] = useState(null)
   const [convertError, setConvertError] = useState('')
   const [selectedLead, setSelectedLead] = useState(null)
-  const [leadQueueFilter, setLeadQueueFilter] = useState('all')
+  const [leadQueueFilter, setLeadQueueFilter] = useState('active')
+  const [leadFrom, setLeadFrom] = useState('')
+  const [leadUntil, setLeadUntil] = useState('')
+  const [projectQuery, setProjectQuery] = useState('')
+  const [projectStatusFilter, setProjectStatusFilter] = useState('all')
+  const [projectPmFilter, setProjectPmFilter] = useState('all')
+  const [pmEditing, setPmEditing] = useState(null)
+  const [pmEditForm, setPmEditForm] = useState({full_name:'',wa_number:''})
+  const [pmEditBusy, setPmEditBusy] = useState(false)
 
   useEffect(() => {
     document.body.classList.add('admin-shell')
@@ -149,10 +157,12 @@ export default function AdminDashboard() {
       supabase
         .from('checklist_tasks')
         .select('id, project_id, text, done, due_date, status, projects!inner(id, slug, bride_name, groom_name, assigned_admin, project_status)')
+        .neq('projects.slug', 'demo')
         .order('due_date', { ascending: true, nullsFirst: false }),
       supabase
         .from('project_events')
         .select('id, project_id, title, event_type, starts_at, ends_at, location, status, projects!inner(id, slug, bride_name, groom_name, assigned_admin, project_status)')
+        .neq('projects.slug', 'demo')
         .eq('status', 'scheduled')
         .order('starts_at', { ascending: true }),
     ])
@@ -272,6 +282,18 @@ export default function AdminDashboard() {
     } finally {
       setSavingPm(false)
     }
+  }
+
+  async function managePm(action, pm) {
+    if (action === 'deactivate_pm' && !window.confirm(`Nonaktifkan akses PM ${pm.full_name}? Riwayatnya tetap tersimpan.`)) return
+    setPmEditBusy(true); setPmErr(''); setPmSuccess('')
+    try {
+      await invokeAccess({action, pm_id:pm.id, ...(action === 'update_pm' ? pmEditForm : {})})
+      setPmSuccess(action === 'update_pm' ? 'Data PM diperbarui.' : action === 'deactivate_pm' ? 'Akses PM dinonaktifkan.' : 'Akses PM diaktifkan kembali.')
+      setPmEditing(null)
+      await fetchAdmins()
+    } catch (err) { setPmErr(err.message) }
+    finally { setPmEditBusy(false) }
   }
 
   async function handleSendInvitation(project, invitation) {
@@ -506,8 +528,21 @@ export default function AdminDashboard() {
     .sort((a,b) => new Date(a.next_follow_up_at) - new Date(b.next_follow_up_at))
   const unscheduledNewLeads = openLeads.filter(lead => lead.status === 'new' && !lead.next_follow_up_at)
     .sort((a,b) => new Date(a.created_at) - new Date(b.created_at))
-  const filteredLeads = leadQueueFilter === 'due' ? dueFollowUps
-    : leadQueueFilter === 'new' ? unscheduledNewLeads : leads
+  const leadPool = leadQueueFilter === 'due' ? dueFollowUps
+    : leadQueueFilter === 'new' ? unscheduledNewLeads
+    : leadQueueFilter === 'booked' ? leads.filter(lead => lead.status === 'booked')
+    : leadQueueFilter === 'lost' ? leads.filter(lead => lead.status === 'lost')
+    : leadQueueFilter === 'all' ? leads : openLeads
+  const jakartaDate = value => new Intl.DateTimeFormat('sv-SE', {timeZone:'Asia/Jakarta',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value))
+  const filteredLeads = leadPool.filter(lead => {
+    const date = jakartaDate(lead.created_at)
+    return (!leadFrom || date >= leadFrom) && (!leadUntil || date <= leadUntil)
+  })
+  const filteredProjects = projects.filter(p =>
+    (projectStatusFilter === 'all' || p.project_status === projectStatusFilter) &&
+    (projectPmFilter === 'all' || p.assigned_admin === projectPmFilter) &&
+    `${p.bride_name} ${p.groom_name} ${p.slug} ${p.location || ''}`.toLocaleLowerCase('id-ID').includes(projectQuery.trim().toLocaleLowerCase('id-ID'))
+  )
   const openLeadQueue = filter => { setLeadQueueFilter(filter); setView('leads') }
   const formatDate = (value, withTime=false) => value
     ? new Date(value).toLocaleDateString('id-ID', {
@@ -748,15 +783,24 @@ export default function AdminDashboard() {
               ))}
             </div>
 
+            <div className="admin-list-filters" aria-label="Filter project">
+              <input aria-label="Cari project" placeholder="Cari nama, link, atau kota" value={projectQuery} onChange={e=>setProjectQuery(e.target.value)}/>
+              <select aria-label="Status project" value={projectStatusFilter} onChange={e=>setProjectStatusFilter(e.target.value)}>
+                <option value="all">Semua status</option><option value="active">Aktif</option><option value="done">Selesai</option>
+              </select>
+              {isSupeadmin && <select aria-label="Project Manager" value={projectPmFilter} onChange={e=>setProjectPmFilter(e.target.value)}>
+                <option value="all">Semua PM</option>{admins.filter(a=>a.is_active !== false).map(a=><option key={a.id} value={a.id}>{a.full_name}</option>)}
+              </select>}
+            </div>
             {/* Project cards */}
             {loading ? (
               <div style={{ textAlign: 'center', padding: '40px', color: MUTED }}>Memuat...</div>
-            ) : projects.length === 0 ? (
+            ) : filteredProjects.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '60px 20px',
                 background: WHITE, borderRadius: 14, border: `1px solid ${BORDER}` }}>
                 <p style={{ fontSize: 32, margin: '0 0 8px' }}>💍</p>
                 <p style={{ fontSize: 14, fontWeight: 500, color: DARK, margin: '0 0 4px' }}>
-                  Belum ada project
+                  {projects.length ? 'Tidak ada project sesuai filter.' : 'Belum ada project'}
                 </p>
                 <p style={{ fontSize: 13, color: MUTED, margin: '0 0 16px' }}>
                   Buat project pertama untuk klien kakak
@@ -769,7 +813,7 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {projects.map(p => {
+                {filteredProjects.map(p => {
                   const weddingDate = p.wedding_date ? new Date(p.wedding_date) : null
                   const isUpcoming = weddingDate && weddingDate > new Date()
                   const status = p.project_status === 'done' ? 'done' : isUpcoming ? 'upcoming' : 'active'
@@ -1003,9 +1047,15 @@ export default function AdminDashboard() {
                 {[['Total lead',leads.length],['Perlu dihubungi',leads.filter(l=>l.status==='new').length],['Sudah booking',leads.filter(l=>l.status==='booked').length]].map(([label,val])=><div key={label} style={{background:WHITE,border:`1px solid ${BORDER}`,borderRadius:12,padding:'13px 15px'}}><p style={{fontSize:22,fontFamily:'Lora, serif',fontWeight:700,color:G900,margin:0}}>{val}</p><p style={{fontSize:10,color:MUTED,margin:'2px 0 0'}}>{label}</p></div>)}
               </div>
               <div className="lead-queue-filters" role="group" aria-label="Filter calon client">
-                {[['all','Semua',leads.length],['due','Jatuh tempo',dueFollowUps.length],['new','Baru tanpa jadwal',unscheduledNewLeads.length]].map(([key,label,count]) =>
+                {[['active','Aktif',openLeads.length],['due','Jatuh tempo',dueFollowUps.length],['new','Baru tanpa jadwal',unscheduledNewLeads.length],['booked','Sudah booking',leads.filter(l=>l.status==='booked').length],['lost','Batal',leads.filter(l=>l.status==='lost').length],['all','Semua riwayat',leads.length]].map(([key,label,count]) =>
                   <button key={key} type="button" aria-pressed={leadQueueFilter===key}
                     onClick={()=>setLeadQueueFilter(key)}>{label} ({count})</button>)}
+              </div>
+              <div className="admin-list-filters" aria-label="Filter tanggal input calon client">
+                <label>Dari tanggal<input type="date" value={leadFrom} max={leadUntil || undefined} onChange={e=>setLeadFrom(e.target.value)}/></label>
+                <label>Sampai tanggal<input type="date" value={leadUntil} min={leadFrom || undefined} onChange={e=>setLeadUntil(e.target.value)}/></label>
+                {(leadFrom || leadUntil) && <button type="button" onClick={()=>{setLeadFrom('');setLeadUntil('')}}>Hapus filter tanggal</button>}
+                <span>{filteredLeads.length} calon client</span>
               </div>
               {leadsLoading ? <div style={{textAlign:'center',padding:32,color:MUTED}}>Memuat calon client…</div> :
               filteredLeads.length === 0 ? <div style={{background:WHITE,border:`1px solid ${BORDER}`,borderRadius:14,padding:32,textAlign:'center',color:MUTED,fontSize:12}}>{leads.length ? 'Tidak ada lead pada filter ini.' : 'Belum ada calon client.'}</div> :
@@ -1272,8 +1322,10 @@ export default function AdminDashboard() {
             <div style={{ background: WHITE, borderRadius: 14, border: `1px solid ${BORDER}`, padding: '24px' }}>
               <p style={{ fontFamily: 'Lora, serif', fontSize: 18, fontWeight: 600,
                 color: DARK, margin: '0 0 16px', fontStyle: 'italic' }}>
-                Tim admin aktif
+                Kelola Project Manager
               </p>
+              {pmErr && <p role="alert" style={{color:RED,fontSize:12,marginBottom:10}}>{pmErr}</p>}
+              {pmSuccess && <p role="status" style={{color:G700,fontSize:12,marginBottom:10}}>{pmSuccess}</p>}
               {admins.map(a => (
                 <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between',
                   alignItems: 'center', padding: '12px 0', borderBottom: `1px solid ${BORDER}` }}>
@@ -1285,13 +1337,22 @@ export default function AdminDashboard() {
                       {a.wa_number || 'WA belum diset'} · {projects.filter(p => p.assigned_admin === a.id).length} project
                     </p>
                   </div>
-                  <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20,
+                  <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20,
                     background: a.role === 'superadmin' ? '#EDE9FE' : G50,
                     color: a.role === 'superadmin' ? '#5B21B6' : G700 }}>
-                    {a.role}
-                  </span>
+                    {a.is_active === false ? 'Nonaktif' : a.role}
+                  </span>{a.role === 'admin' && <>
+                    <button type="button" disabled={pmEditBusy} onClick={()=>{setPmEditing(a.id);setPmEditForm({full_name:a.full_name,wa_number:a.wa_number || ''})}}>Edit</button>
+                    <button type="button" disabled={pmEditBusy} onClick={()=>managePm(a.is_active === false ? 'reactivate_pm' : 'deactivate_pm',a)}>{a.is_active === false ? 'Aktifkan' : 'Nonaktifkan'}</button>
+                  </>}</div>
                 </div>
               ))}
+              {pmEditing && <form className="pm-edit-form" onSubmit={e=>{e.preventDefault();managePm('update_pm',admins.find(a=>a.id === pmEditing))}}>
+                <strong>Edit data PM</strong>
+                <label>Nama lengkap<input required minLength="2" maxLength="100" value={pmEditForm.full_name} onChange={e=>setPmEditForm(s=>({...s,full_name:e.target.value}))}/></label>
+                <label>Nomor WhatsApp<input maxLength="25" value={pmEditForm.wa_number} onChange={e=>setPmEditForm(s=>({...s,wa_number:e.target.value}))}/></label>
+                <button disabled={pmEditBusy}>Simpan</button><button type="button" onClick={()=>setPmEditing(null)}>Batal</button>
+              </form>}
               {admins.length === 0 && (
                 <p style={{ fontSize: 13, color: MUTED, textAlign: 'center', padding: '20px 0' }}>
                   Belum ada admin
