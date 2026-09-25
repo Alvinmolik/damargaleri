@@ -92,7 +92,7 @@ Deno.serve(async (request: Request) => {
       const cleaned = String(value || '').trim()
       if (field.required && !cleaned && !(field.key === 'event_date' && estimatedMonth)) return reply(origin, { error: `Lengkapi kolom ${field.key}.` }, 400)
       if (cleaned.length > 500) return reply(origin, { error: 'Isian terlalu panjang.' }, 400)
-      if (field.type === 'select' && cleaned && !field.options?.includes(cleaned)) {
+      if (field.type === 'select' && field.key !== 'interested_package' && cleaned && !field.options?.includes(cleaned)) {
         return reply(origin, { error: 'Pilihan tidak valid.' }, 400)
       }
       if (cleaned) answers[field.key] = cleaned
@@ -116,6 +116,34 @@ Deno.serve(async (request: Request) => {
     const budget = answers.estimated_budget ? Number(answers.estimated_budget) : 0
     if (!Number.isSafeInteger(budget) || budget < 0) return reply(origin, { error: 'Budget tidak valid.' }, 400)
 
+    let packageId: string | null = null
+    let promotionId: string | null = null
+    const packageEnabled = (settings.fields as FormField[]).some(field => field.key === 'interested_package' && field.enabled !== false)
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    if (packageEnabled && (inputs.package_id || inputs.promotion_id)) {
+      if (typeof inputs.package_id !== 'string' || !uuid.test(inputs.package_id) ||
+        inputs.promotion_id && (typeof inputs.promotion_id !== 'string' || !uuid.test(inputs.promotion_id))) {
+        return reply(origin, { error:'Pilihan paket atau promo tidak valid.' }, 400)
+      }
+      const { data: pkg, error: packageError } = await admin.from('service_packages')
+        .select('id,name,is_active').eq('id',inputs.package_id).maybeSingle()
+      if (packageError) throw packageError
+      if (!pkg?.is_active) return reply(origin, { error:'Paket tidak tersedia lagi. Muat ulang formulir.' }, 400)
+      packageId = pkg.id
+      answers.interested_package = pkg.name
+      if (inputs.promotion_id) {
+        const { data: promo, error: promoError } = await admin.from('promotions')
+          .select('id,package_id,is_active,valid_from,valid_until').eq('id',inputs.promotion_id).maybeSingle()
+        if (promoError) throw promoError
+        const today = new Intl.DateTimeFormat('sv-SE', {timeZone:'Asia/Jakarta',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())
+        if (!promo?.is_active || promo.package_id && promo.package_id !== pkg.id ||
+          promo.valid_from && promo.valid_from > today || promo.valid_until && promo.valid_until < today) {
+          return reply(origin, { error:'Promo tidak berlaku untuk pilihan ini. Muat ulang formulir.' }, 400)
+        }
+        promotionId = promo.id
+      }
+    }
+
     const tracking = body.tracking && typeof body.tracking === 'object' && !Array.isArray(body.tracking)
       ? body.tracking : {}
     const track = (key: string) => String(tracking[key] || '').slice(0, 120).trim() || null
@@ -129,6 +157,7 @@ Deno.serve(async (request: Request) => {
       estimated_event_month:estimatedMonth || null,
       location:answers.location || null, estimated_budget:budget,
       interested_package:answers.interested_package || null,
+      package_id:packageId, promotion_id:promotionId,
       source:'website', source_detail:answers.source_detail || null,
       utm_source:track('utm_source'), utm_medium:track('utm_medium'), utm_campaign:track('utm_campaign'),
       form_answers:extra, owner_admin:null, created_by:null,
